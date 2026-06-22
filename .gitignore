@@ -2,7 +2,10 @@
 .env.*
 !.env.example
 
+# Локальные рабочие материалы: планы, чеклисты, прогресс, контекст. В репозиторий не идут.
+/plans/
 CHECKLIST.local.md
+chat-export.md
 
 .idea/
 .vscode/

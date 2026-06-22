@@ -17,6 +17,13 @@ DocSign Hub starts as a modular Laravel monolith. The goal is to keep the codeba
 
 Controllers should stay thin: request validation, authorization, action/service call, resource response. Domain logic belongs to `app/Domain`, API controllers to `app/Http/Controllers/Api/V1`, and infrastructure concerns to `app/Infrastructure`.
 
+## Authentication
+
+The API uses Laravel Sanctum personal access tokens (Bearer). Public `auth/register` and
+`auth/login` endpoints are rate limited per IP; they return a plain-text token once, and only
+its hash is stored. Protected endpoints sit behind the `auth:sanctum` guard, and `auth/logout`
+revokes the current token. All `api/*` responses, including errors, are rendered as JSON.
+
 The future signing flow will use status transitions:
 
 ```text

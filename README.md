@@ -2,7 +2,7 @@
 
 DocSign Hub - демонстрационный сервис для сценария электронного подписания документов. Проект собирается как pet project для GitHub/LinkedIn: Laravel API, Vue dashboard, Docker-инфраструктура и понятный задел под доменную логику, очереди и audit trail.
 
-Сейчас реализован только bootstrap: каркас backend/frontend, health endpoint, локальная инфраструктура и документация запуска. Бизнес-логика подписания будет добавляться отдельными шагами.
+Сейчас готовы каркас backend/frontend, health endpoint, локальная инфраструктура и аутентификация по токенам (Sanctum). Бизнес-логика документов и подписания добавляется отдельными шагами.
 
 ## Стек
 
@@ -14,6 +14,8 @@ DocSign Hub - демонстрационный сервис для сценар�
 
 - Laravel 12 в `backend/`.
 - Vue 3 + TypeScript + Vite в `frontend/`.
+- Аутентификация по токенам (Laravel Sanctum): регистрация, логин, логаут, профиль.
+- Rate limit на auth-endpoints, пароли хешируются, токены хранятся только хешем.
 - API endpoint `GET /api/v1/health`.
 - Базовый frontend-экран с проверкой API health.
 - Docker Compose для backend, nginx, frontend, PostgreSQL, Redis, RabbitMQ, MongoDB и Mailpit.
@@ -48,9 +50,15 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 
 ## API
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| GET | `/api/v1/health` | Проверка доступности API |
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/api/v1/health` | — | Проверка доступности API |
+| POST | `/api/v1/auth/register` | — | Регистрация, возвращает Bearer-токен |
+| POST | `/api/v1/auth/login` | — | Логин, возвращает Bearer-токен |
+| POST | `/api/v1/auth/logout` | Bearer | Отзыв текущего токена |
+| GET | `/api/v1/me` | Bearer | Текущий пользователь |
+
+После `make fresh` доступен демо-пользователь: `owner@docsign.test` / `password`.
 
 ## Архитектура
 
@@ -85,6 +93,6 @@ npm run build
 ## Осознанные ограничения
 
 - Это demo project, не юридически значимая система ЭЦП.
-- На bootstrap-шаге нет регистрации, документов, подписания, outbox publisher и audit writer.
+- Пока нет документов, подписания, outbox publisher и audit writer - они добавляются следующими шагами.
 - Email/SMS не отправляются наружу; для будущих demo-уведомлений подготовлен Mailpit.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.
