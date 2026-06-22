@@ -17,6 +17,19 @@ DocSign Hub starts as a modular Laravel monolith. The goal is to keep the codeba
 
 Controllers should stay thin: request validation, authorization, action/service call, resource response. Domain logic belongs to `app/Domain`, API controllers to `app/Http/Controllers/Api/V1`, and infrastructure concerns to `app/Infrastructure`.
 
+## Documents domain
+
+The documents feature lives under `app/Domain/Documents` (Enums, Models, Actions, Services,
+Policies). Tables: `documents`, `document_parties`, `signature_tokens`, `signatures`,
+`document_status_history`. Status is a PHP enum (`DocumentStatus`) stored as a string column.
+
+Each lifecycle action is a single-purpose class (`CreateDocumentAction`, `AddDocumentPartyAction`,
+`SendDocumentAction`, `CancelDocumentAction`, …). Status changes go through `DocumentStatusService`,
+which updates the document and appends a `document_status_history` row inside the same transaction.
+Access is owner-only via `DocumentPolicy`. Parties can only change while the document is a draft;
+`send` issues a signing token per party — the plain token is returned once and only its SHA-256
+hash is stored, ready for the public signing flow.
+
 ## Authentication
 
 The API uses Laravel Sanctum personal access tokens (Bearer). Public `auth/register` and
@@ -30,7 +43,7 @@ The OpenAPI document is generated from the code (routes, Form Requests, Resource
 served as an interactive page at `/docs/api`, with the raw spec at `/docs/api.json`. It is not
 committed; it always reflects the current routes. Access is restricted to the `local` environment.
 
-The future signing flow will use status transitions:
+Status transitions (the `partially_signed → signed` part is implemented by the upcoming signing flow):
 
 ```text
 draft -> pending -> partially_signed -> signed

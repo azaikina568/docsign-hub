@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\V1\CancelDocumentController;
+use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\DocumentPartyController;
+use App\Http\Controllers\Api\V1\SendDocumentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -20,5 +24,16 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+
+        Route::apiResource('documents', DocumentController::class);
+        Route::get('documents/{document}/events', [DocumentController::class, 'events']);
+
+        Route::scopeBindings()->group(function () {
+            Route::post('documents/{document}/parties', [DocumentPartyController::class, 'store']);
+            Route::delete('documents/{document}/parties/{party}', [DocumentPartyController::class, 'destroy']);
+        });
+
+        Route::post('documents/{document}/send', SendDocumentController::class);
+        Route::post('documents/{document}/cancel', CancelDocumentController::class);
     });
 });

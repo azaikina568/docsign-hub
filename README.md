@@ -2,7 +2,7 @@
 
 DocSign Hub - демонстрационный сервис для сценария электронного подписания документов. Проект собирается как pet project для GitHub/LinkedIn: Laravel API, Vue dashboard, Docker-инфраструктура и понятный задел под доменную логику, очереди и audit trail.
 
-Сейчас готовы каркас backend/frontend, health endpoint, локальная инфраструктура и аутентификация по токенам (Sanctum). Бизнес-логика документов и подписания добавляется отдельными шагами.
+Сейчас готовы каркас backend/frontend, аутентификация по токенам (Sanctum) и доменная часть документов: CRUD, участники, отправка на подписание и отмена с историей статусов. Публичное подписание по токену и события в RabbitMQ добавляются отдельными шагами.
 
 ## Стек
 
@@ -16,6 +16,8 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Vue 3 + TypeScript + Vite в `frontend/`.
 - Аутентификация по токенам (Laravel Sanctum): регистрация, логин, логаут, профиль.
 - Rate limit на auth-endpoints, пароли хешируются, токены хранятся только хешем.
+- Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов.
+- Доменный слой: PHP Enums статусов, Actions/Services, Policies (доступ только владельцу), signing-токены хранятся хешем.
 - API endpoint `GET /api/v1/health`.
 - Интерактивная API-документация (OpenAPI/Swagger) на `/docs/api`, генерируется из кода.
 - Базовый frontend-экран с проверкой API health.
@@ -64,6 +66,16 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | POST | `/api/v1/auth/login` | — | Логин, возвращает Bearer-токен |
 | POST | `/api/v1/auth/logout` | Bearer | Отзыв текущего токена |
 | GET | `/api/v1/me` | Bearer | Текущий пользователь |
+| GET | `/api/v1/documents` | Bearer | Список документов владельца (пагинация) |
+| POST | `/api/v1/documents` | Bearer | Создать документ (draft) |
+| GET | `/api/v1/documents/{document}` | Bearer | Документ с участниками |
+| PATCH | `/api/v1/documents/{document}` | Bearer | Изменить draft |
+| DELETE | `/api/v1/documents/{document}` | Bearer | Удалить draft |
+| POST | `/api/v1/documents/{document}/parties` | Bearer | Добавить участника (draft) |
+| DELETE | `/api/v1/documents/{document}/parties/{party}` | Bearer | Удалить участника (draft) |
+| POST | `/api/v1/documents/{document}/send` | Bearer | Отправить на подписание |
+| POST | `/api/v1/documents/{document}/cancel` | Bearer | Отменить документ |
+| GET | `/api/v1/documents/{document}/events` | Bearer | История статусов |
 
 После `make fresh` доступен демо-пользователь: `owner@docsign.test` / `password`.
 
@@ -100,6 +112,6 @@ npm run build
 ## Осознанные ограничения
 
 - Это demo project, не юридически значимая система ЭЦП.
-- Пока нет документов, подписания, outbox publisher и audit writer - они добавляются следующими шагами.
+- Пока нет публичного подписания по токену, outbox publisher и audit writer - они добавляются следующими шагами.
 - Email/SMS не отправляются наружу; для будущих demo-уведомлений подготовлен Mailpit.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.
