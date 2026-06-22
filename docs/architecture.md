@@ -24,6 +24,12 @@ The API uses Laravel Sanctum personal access tokens (Bearer). Public `auth/regis
 its hash is stored. Protected endpoints sit behind the `auth:sanctum` guard, and `auth/logout`
 revokes the current token. All `api/*` responses, including errors, are rendered as JSON.
 
+## API documentation
+
+The OpenAPI document is generated from the code (routes, Form Requests, Resources) by Scramble and
+served as an interactive page at `/docs/api`, with the raw spec at `/docs/api.json`. It is not
+committed; it always reflects the current routes. Access is restricted to the `local` environment.
+
 The future signing flow will use status transitions:
 
 ```text

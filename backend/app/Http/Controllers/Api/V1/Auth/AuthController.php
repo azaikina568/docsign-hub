@@ -13,8 +13,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @group Authentication
+ */
 class AuthController extends Controller
 {
+    /**
+     * Register a new account and issue an API token.
+     */
     public function register(RegisterRequest $request, RegisterUserAction $action): JsonResponse
     {
         $user = $action->execute($request->validated());
@@ -22,6 +28,9 @@ class AuthController extends Controller
         return $this->tokenResponse($user, 'Registered.', 201);
     }
 
+    /**
+     * Log in with email and password and issue an API token.
+     */
     public function login(LoginRequest $request): JsonResponse
     {
         $user = User::where('email', $request->string('email'))->first();
@@ -35,6 +44,9 @@ class AuthController extends Controller
         return $this->tokenResponse($user, 'Logged in.');
     }
 
+    /**
+     * Revoke the current API token.
+     */
     public function logout(Request $request): JsonResponse
     {
         $request->user()?->currentAccessToken()->delete();
@@ -42,6 +54,9 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out.']);
     }
 
+    /**
+     * Get the authenticated user.
+     */
     public function me(Request $request): UserResource
     {
         return new UserResource($request->user());

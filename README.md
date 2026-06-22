@@ -8,7 +8,7 @@ DocSign Hub - демонстрационный сервис для сценар�
 
 - Backend: PHP 8.4 в Docker, Laravel 12, PostgreSQL, Redis, RabbitMQ, MongoDB, Mailpit.
 - Frontend: Vue 3, TypeScript, Vite, Tailwind CSS, TanStack Query, Pinia, shadcn-vue-ready structure.
-- Infra: Docker Compose, nginx, Makefile, PHPUnit, Pint, PHPStan/Larastan.
+- Infra: Docker Compose, nginx, Makefile, PHPUnit, Pint, PHPStan/Larastan, OpenAPI/Swagger (Scramble).
 
 ## Что реализовано
 
@@ -17,6 +17,7 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Аутентификация по токенам (Laravel Sanctum): регистрация, логин, логаут, профиль.
 - Rate limit на auth-endpoints, пароли хешируются, токены хранятся только хешем.
 - API endpoint `GET /api/v1/health`.
+- Интерактивная API-документация (OpenAPI/Swagger) на `/docs/api`, генерируется из кода.
 - Базовый frontend-экран с проверкой API health.
 - Docker Compose для backend, nginx, frontend, PostgreSQL, Redis, RabbitMQ, MongoDB и Mailpit.
 - Корневой `.env.example`, `.gitignore`, Makefile и краткая архитектурная документация.
@@ -25,6 +26,7 @@ DocSign Hub - демонстрационный сервис для сценар�
 
 ```bash
 cp .env.example .env
+make key   # генерирует APP_KEY в .env (один раз, до запуска)
 make up
 make fresh
 ```
@@ -32,15 +34,20 @@ make fresh
 Если `make` недоступен:
 
 ```bash
-docker-compose up -d --build
-docker-compose exec backend php artisan key:generate --force
-docker-compose exec backend php artisan migrate:fresh --seed
+cp .env.example .env
+# сгенерировать APP_KEY и вписать значение в строку APP_KEY= в .env:
+docker compose run --rm --no-deps backend php artisan key:generate --show
+docker compose up -d --build
+docker compose exec backend php artisan migrate:fresh --seed
 ```
+
+`APP_KEY` хранится в корневом `.env`, потому что именно его контейнер подключает через `env_file`.
 
 ## Локальные URL
 
 - Frontend: http://localhost:3000
 - API health: http://localhost:8080/api/v1/health
+- API docs (OpenAPI/Swagger, интерактивные): http://localhost:8080/docs/api
 - RabbitMQ: http://localhost:15672
 - Mailpit: http://localhost:8025
 - MongoDB: `localhost:27017`
