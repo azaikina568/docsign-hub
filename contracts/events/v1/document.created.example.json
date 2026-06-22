@@ -1,0 +1,13 @@
+{
+  "event_id": "018f62f3-2f63-7d6d-9b76-3f7c603f6f3c",
+  "event_type": "document.created",
+  "routing_key": "document.created.v1",
+  "version": 1,
+  "occurred_at": "2026-06-22T09:00:00Z",
+  "aggregate_id": "document-demo-id",
+  "actor_id": "user-demo-id",
+  "data": {
+    "title": "Demo contract",
+    "status": "draft"
+  }
+}
