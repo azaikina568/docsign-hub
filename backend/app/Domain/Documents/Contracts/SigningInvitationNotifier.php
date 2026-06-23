@@ -7,7 +7,7 @@ use App\Domain\Documents\Models\Document;
 
 /**
  * Доставка приглашения на подписание. Доменный слой не знает, как именно
- * (письмо, очередь, внешний сервis) — реализация живёт в Infrastructure.
+ * (письмо, очередь, внешний сервис) — реализация живёт в Infrastructure.
  */
 interface SigningInvitationNotifier
 {
