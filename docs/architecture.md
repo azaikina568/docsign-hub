@@ -4,8 +4,11 @@ DocSign Hub starts as a modular Laravel monolith. The goal is to keep the codeba
 
 ## Runtime
 
+Diagrams (ERD, state machine, send sequence, deployment, messaging): [diagrams.md](diagrams.md).
+
 - `nginx` serves the Laravel API through PHP-FPM.
 - `backend` runs Laravel 12 on PHP 8.4 in Docker.
+- `scheduler` is a dedicated container running `php artisan schedule:work` (drives `documents:expire`).
 - `frontend` runs Vue 3 + TypeScript + Vite.
 - `postgres` stores business data.
 - `redis` is reserved for cache, rate limiting and short locks.
@@ -35,9 +38,16 @@ ULID is what `DocumentResource` exposes as `id` and what route-model binding res
 (`Document::getRouteKeyName()`). Nested parties keep their integer ids (scoped to the document).
 
 **Expiration.** `ExpireDocumentsAction` (driven by the `documents:expire` console command, scheduled
-daily in `routes/console.php`) moves any `pending`/`partially_signed` document past its `expires_at`
-to `expired` through the same transition map and history (actor = system, so `changed_by_user_id` is
-null). Each document is expired in its own transaction so one failure does not roll back the rest.
+daily in `routes/console.php` and run by the `scheduler` container) moves any `pending`/`partially_signed`
+document past its `expires_at` to `expired` through the same transition map and history (actor = system,
+so `changed_by_user_id` is null). It streams candidates with `lazyById()` (constant memory) and expires
+each document in its own transaction, so one failure does not roll back the rest. The scheduled task is
+marked `onOneServer()` so duplicate schedulers cannot run it twice.
+
+A document's deadline is set at `send`: if the owner gave no `expires_at`, the default TTL
+(`docsign.signing_token_ttl_days`) is persisted onto the document. So a sent document always has a
+deadline and its signing tokens share the exact same instant — there is no "sent but never expiring"
+state.
 
 **Roles & access.** Two distinct concepts. The **owner** manages the document (CRUD, parties, send,
 cancel) — enforced by `DocumentPolicy`. **Parties** are the people involved per document, with a
@@ -59,8 +69,8 @@ binds to it so later edits are detectable. It is not populated yet (signing flow
 
 **Signing tokens.** `send` issues one signing token per signer; only its SHA-256 hash is stored.
 The plain token is never returned to the sender — it is delivered to each signer's own email
-(Mailpit in dev) through a `SigningInvitationNotifier`. Tokens always get an expiry
-(`docsign.signing_token_ttl_days`, or the document's own `expires_at`).
+(Mailpit in dev) through a `SigningInvitationNotifier`. Every token expires at the document's deadline
+(see Expiration above), so a token is never open-ended.
 
 **Decoupling seam.** `SendDocumentAction` raises a domain event `DocumentSent` after commit; the
 `SendSigningInvitations` listener delivers invitations via the `SigningInvitationNotifier` contract

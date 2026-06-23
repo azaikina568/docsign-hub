@@ -62,6 +62,9 @@ class DocumentController extends Controller
         return response()->json(['message' => 'Document deleted.']);
     }
 
+    /**
+     * Document status history (paginated; pass ?sort=asc for chronological order).
+     */
     public function events(Request $request, Document $document): AnonymousResourceCollection
     {
         $this->authorize('view', $document);
