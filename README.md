@@ -20,8 +20,9 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Пара токенов access + refresh: короткий access для API, долгий refresh для обновления; `/auth/refresh` ротирует refresh с детекцией переиспользования (отзыв всей сессии), `logout` рвёт обе стороны. Access и refresh невзаимозаменяемы (token abilities).
 - Rate limit на auth-endpoints и на всём аутентифицированном API, пароли хешируются, токены хранятся только хешем.
 - Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов (пагинация + сортировка).
+- Подписание: строго последовательное (`signing_order`), идемпотентное, по модели «capability или identity» — внешний участник подписывает по одноразовой ссылке из письма, зарегистрированный — только под своим логином. Переходы `pending → partially_signed → signed`, фиксируются подпись (`signature_hash`, ip/user-agent) и снимок содержимого (`content_hash`).
 - Документ адресуется в API по публичному ULID (а не по внутреннему числовому id).
-- Дедлайн документа фиксируется при отправке (явный `expires_at` владельца или дефолтный TTL); на этот же момент истекают signing-токены.
+- Дедлайн документа фиксируется при отправке (явный `expires_at` владельца или дефолтный TTL); на этот же момент истекают signing-токены. Дедлайн активного документа можно продлить (`PATCH …/deadline`) — синхронно сдвигается и срок неиспользованных токенов.
 - Авто-экспирация: команда `documents:expire` под ежедневным расписанием (отдельный scheduler-контейнер) переводит просроченные документы в `expired`.
 - Доменный слой: PHP Enums + явная карта переходов статусов, Actions/Services, Policies (управляет только владелец).
 - Подписанты идентифицируются по email (аккаунт необязателен) и опционально связываются с пользователем системы.
@@ -85,7 +86,12 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | DELETE | `/api/v1/documents/{document}/parties/{party}` | Bearer | Удалить участника (draft) |
 | POST | `/api/v1/documents/{document}/send` | Bearer | Отправить на подписание |
 | POST | `/api/v1/documents/{document}/cancel` | Bearer | Отменить документ |
+| PATCH | `/api/v1/documents/{document}/deadline` | Bearer | Продлить дедлайн активного документа |
 | GET | `/api/v1/documents/{document}/events` | Bearer | История статусов (пагинация; `?sort=asc` для хронологии) |
+| GET | `/api/v1/signing/{token}` | — | Контекст подписания по одноразовому токену (публичный) |
+| POST | `/api/v1/signing/{token}/sign` | — / Bearer | Подписать по токену (для account-bound — с логином) |
+| GET | `/api/v1/signing-requests` | Bearer | Документы, ожидающие моей подписи |
+| POST | `/api/v1/signing-requests/{party}/sign` | Bearer | Подписать своё участие из дашборда |
 
 `{document}` — публичный ULID документа (поле `id` в ответе), не внутренний числовой id.
 

@@ -90,6 +90,27 @@ class DocumentPartyTest extends TestCase
         $this->assertDatabaseHas('document_parties', ['email' => 'viewer@example.com', 'signing_order' => null]);
     }
 
+    public function test_signing_order_auto_increments_for_signers_without_explicit_order(): void
+    {
+        $user = User::factory()->create();
+        $document = Document::factory()->create(['owner_id' => $user->id]);
+
+        Sanctum::actingAs($user, ['access-api']);
+
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
+            'name' => 'First', 'email' => 'first@example.com',
+        ])->assertCreated()->assertJsonPath('data.signing_order', 1);
+
+        // Наблюдатель не занимает место в очереди.
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
+            'name' => 'Watcher', 'email' => 'watcher@example.com', 'role' => 'viewer',
+        ])->assertCreated()->assertJsonPath('data.signing_order', null);
+
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
+            'name' => 'Second', 'email' => 'second@example.com',
+        ])->assertCreated()->assertJsonPath('data.signing_order', 2);
+    }
+
     public function test_duplicate_party_email_is_rejected(): void
     {
         $user = User::factory()->create();

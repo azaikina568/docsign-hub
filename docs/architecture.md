@@ -61,12 +61,13 @@ least one signer.
 Access uses one consistent model — **identity or capability**. Identity = an authenticated `User`
 (Sanctum), used for owner actions and for parties that are linked to an account. Capability = a
 single-use signing token delivered to a party's email, used by parties without an account. The
-upcoming signing flow combines them: an account-bound party must be authenticated as that user
-(a leaked token alone is not enough), while an email-only party signs by possession of the token.
+signing flow combines them: an account-bound party (`document_parties.user_id` set) must be
+authenticated as that user (a leaked token alone is not enough), while an email-only party signs by
+possession of the token. See **Signing** below.
 
-**content_hash.** Reserved for signing integrity: at `send` it will be set to a hash of the
-signable snapshot (today: title + ordered parties; later: the uploaded file), and each signature
-binds to it so later edits are detectable. It is not populated yet (signing flow).
+**content_hash.** Set at `send` to a SHA-256 of the signable snapshot (today: title + ordered
+parties; later: the uploaded file). Each signature binds to it (`signature_hash` derives from it), so
+a later content change is detectable against existing signatures.
 
 **Signing tokens.** `send` issues one signing token per signer; only its SHA-256 hash is stored.
 The plain token is never returned to the sender — it is delivered to each signer's own email
@@ -78,6 +79,26 @@ The plain token is never returned to the sender — it is delivered to each sign
 (infra implementation: `MailSigningInvitationNotifier`). This is the seam where the RabbitMQ outbox
 and audit writers will hook in (Этап 5) without touching the action — and the boundary along which
 notifications/audit could later move into separate services.
+
+**Signing.** `SignDocumentAction` is the single entry for both scenarios. Public capability path:
+`GET /signing/{token}` returns a party's own context (no other parties' data — only aggregate
+progress) and `POST /signing/{token}/sign` signs. Identity path for registered parties:
+`GET /signing-requests` lists pending participations and `POST /signing-requests/{party}/sign` signs
+under `auth:sanctum`. Rules enforced inside the action, in this order: the actor is authorised first
+(capability token for email-only parties, matching login for account-bound — so a non-participant
+always gets 403 and cannot probe document state); signing is **idempotent** (re-signing returns the
+existing signature); the document must be open and not past its deadline; the token must be unused;
+and **strictly sequential** — a signer with `signing_order = N` is blocked until every signer with a
+smaller order has signed. The document row is locked (`lockForUpdate`) for the duration to serialise
+concurrent signatures. Each signature stores `signature_hash` (`sha256(content_hash + party_id +
+signed_at + nonce)`), a `signed_payload` snapshot, ip and user-agent; the token is marked `used_at`.
+The document advances `pending → partially_signed` and, once all signers are done, `→ signed`.
+
+**Deadline extension.** `PATCH /documents/{ulid}/deadline` (owner, document still awaiting
+signatures) moves `expires_at` forward and updates the still-unused tokens to the same instant,
+keeping the "document deadline = token deadline" invariant. It records an audit row in the status
+history without a status change. Terminal documents cannot be extended, and the deadline only moves
+forward.
 
 ## Authentication
 
@@ -107,7 +128,7 @@ The OpenAPI document is generated from the code (routes, Form Requests, Resource
 served as an interactive page at `/docs/api`, with the raw spec at `/docs/api.json`. It is not
 committed; it always reflects the current routes. Access is restricted to the `local` environment.
 
-Status transitions (the `partially_signed → signed` part is implemented by the upcoming signing flow):
+Status transitions:
 
 ```text
 draft -> pending -> partially_signed -> signed

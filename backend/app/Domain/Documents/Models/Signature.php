@@ -4,7 +4,18 @@ namespace App\Domain\Documents\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $document_id
+ * @property int $document_party_id
+ * @property string $signature_hash
+ * @property array<string, mixed>|null $signed_payload
+ * @property string|null $ip_address
+ * @property string|null $user_agent
+ * @property Carbon $signed_at
+ */
 class Signature extends Model
 {
     public $timestamps = false;

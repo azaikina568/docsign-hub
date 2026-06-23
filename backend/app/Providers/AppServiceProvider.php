@@ -41,6 +41,16 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Публичные signing-роуты: защита от перебора токенов — лимит и по IP, и по самому токену.
+        RateLimiter::for('signing', function (Request $request) {
+            $token = (string) $request->route('token');
+
+            return [
+                Limit::perMinute(20)->by('signing-ip:'.$request->ip()),
+                Limit::perMinute(10)->by('signing-token:'.sha1($token)),
+            ];
+        });
+
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Gate::policy(Document::class, DocumentPolicy::class);

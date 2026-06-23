@@ -43,6 +43,9 @@ class SendDocumentAction
 
         $invitations = DB::transaction(function () use ($document, $actor, $signers, $deadline) {
             $document->expires_at = $deadline;
+            // Снимок подписываемого: подписи привязываются к нему через content_hash,
+            // поэтому позднейшее изменение содержимого детектируется (см. SIGNING_SECURITY.md).
+            $document->content_hash = $this->contentHash($document);
 
             $invitations = [];
 
@@ -68,5 +71,27 @@ class SendDocumentAction
         DocumentSent::dispatch($document, $invitations);
 
         return $document;
+    }
+
+    /**
+     * Канонический снимок документа: title + участники в стабильном порядке.
+     * В будущем сюда добавится хеш реального файла документа.
+     */
+    private function contentHash(Document $document): string
+    {
+        $snapshot = [
+            'title' => $document->title,
+            'parties' => $document->parties
+                ->sortBy([['signing_order', 'asc'], ['email', 'asc']])
+                ->map(fn ($party) => [
+                    'email' => $party->email,
+                    'role' => $party->role->value,
+                    'signing_order' => $party->signing_order,
+                ])
+                ->values()
+                ->all(),
+        ];
+
+        return hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR));
     }
 }

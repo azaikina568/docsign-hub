@@ -31,8 +31,16 @@ class AddDocumentPartyAction
             'email' => $data['email'],
             'role' => $role,
             // Порядок подписания актуален только для подписантов; у наблюдателей он null.
-            'signing_order' => $role === PartyRole::Signer ? ($data['signing_order'] ?? 1) : null,
+            // Без явного order — добавляем в конец очереди (max существующих + 1).
+            'signing_order' => $role === PartyRole::Signer
+                ? ($data['signing_order'] ?? $this->nextSigningOrder($document))
+                : null,
             'status' => PartyStatus::Pending,
         ]);
+    }
+
+    private function nextSigningOrder(Document $document): int
+    {
+        return (int) $document->parties()->where('role', PartyRole::Signer)->max('signing_order') + 1;
     }
 }

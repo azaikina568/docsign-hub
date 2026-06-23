@@ -93,11 +93,11 @@ stateDiagram-v2
     [*] --> draft : create
     draft --> pending : send (минимум 1 signer)
     draft --> cancelled : cancel
-    pending --> partially_signed : sign (stage 4)
-    pending --> signed : sign last (stage 4)
+    pending --> partially_signed : sign (не последний)
+    pending --> signed : sign последний
     pending --> cancelled : cancel
     pending --> expired : срок истёк
-    partially_signed --> signed : sign last (stage 4)
+    partially_signed --> signed : sign последний
     partially_signed --> cancelled : cancel
     partially_signed --> expired : срок истёк
     signed --> [*]
@@ -141,6 +141,46 @@ sequenceDiagram
 
 Plain-токен живёт только в памяти (`SigningInvitation`) и уходит подписанту письмом; отправителю не
 возвращается. Рассылка — после commit, чтобы сбой доставки не откатывал отправку.
+
+## Подписание участником (sequence)
+
+**Что показывает:** как участник подписывает (`POST /signing/{token}/sign`) строго по очереди.
+Два пути идентификации: внешний — по capability-токену из письма; зарегистрированный — по своей
+identity (логину). Голубая рамка — транзакция с блокировкой документа (защита от гонки параллельных
+подписей). Источник истины — `SignDocumentAction`.
+
+```mermaid
+sequenceDiagram
+    actor Signer
+    participant API as SigningController
+    participant Act as SignDocumentAction
+    participant DB as PostgreSQL
+
+    Signer->>API: POST /signing/{token}/sign
+    API->>Act: execute(party, authUser, token)
+    rect rgb(238,246,255)
+    Act->>DB: BEGIN, блокируем документ (lockForUpdate)
+    Note over Act: актёр вправе подписать (capability или identity)
+    alt участник уже подписал
+        Act-->>Signer: 200 та же подпись (идемпотентно)
+    else документ не открыт или срок истёк
+        Act-->>Signer: 409 или 410
+    else не его очередь
+        Note over Act: есть signer с меньшим order и без подписи
+        Act-->>Signer: 409 рано подписывать
+    else можно подписать
+        Act->>DB: signature (hash, ip, user_agent), party в signed
+        Act->>DB: токен в used_at
+        Act->>DB: документ в partially_signed или signed, history
+        Act->>DB: COMMIT
+        Act-->>Signer: 201 подпись создана
+    end
+    end
+```
+
+Account-bound участник (`user_id` задан) подписывает только как он сам: capability-токена мало, нужна
+identity. Зарегистрированный может прийти из дашборда — `GET /signing-requests` и
+`POST /signing-requests/{party}/sign` под `auth:sanctum`.
 
 ## Обновление токенов (sequence)
 
