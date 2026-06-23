@@ -4,6 +4,7 @@ namespace App\Domain\Documents\Models;
 
 use App\Domain\Documents\Enums\PartyRole;
 use App\Domain\Documents\Enums\PartyStatus;
+use App\Models\User;
 use Database\Factories\DocumentPartyFactory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $document_id
+ * @property int|null $user_id
  * @property string $name
  * @property string $email
  * @property PartyRole $role
@@ -29,6 +31,7 @@ class DocumentParty extends Model
 
     protected $fillable = [
         'document_id',
+        'user_id',
         'name',
         'email',
         'role',
@@ -53,6 +56,17 @@ class DocumentParty extends Model
     public function document(): BelongsTo
     {
         return $this->belongsTo(Document::class);
+    }
+
+    /**
+     * Зарегистрированный пользователь, если участник совпадает с аккаунтом по email.
+     * Может быть null — подписант не обязан иметь аккаунт в системе.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

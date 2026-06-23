@@ -34,4 +34,26 @@ enum DocumentStatus: string
     {
         return ! $this->isFinal();
     }
+
+    /**
+     * Разрешён ли переход в указанный статус. Единая карта переходов —
+     * чтобы статус нельзя было «перепрыгнуть» в обход бизнес-правил.
+     */
+    public function canTransitionTo(self $to): bool
+    {
+        return in_array($to, $this->allowedTransitions(), true);
+    }
+
+    /**
+     * @return list<self>
+     */
+    public function allowedTransitions(): array
+    {
+        return match ($this) {
+            self::Draft => [self::Pending, self::Cancelled],
+            self::Pending => [self::PartiallySigned, self::Signed, self::Cancelled, self::Expired],
+            self::PartiallySigned => [self::Signed, self::Cancelled, self::Expired],
+            self::Signed, self::Cancelled, self::Expired => [],
+        };
+    }
 }

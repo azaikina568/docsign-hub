@@ -17,7 +17,9 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Аутентификация по токенам (Laravel Sanctum): регистрация, логин, логаут, профиль.
 - Rate limit на auth-endpoints, пароли хешируются, токены хранятся только хешем.
 - Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов.
-- Доменный слой: PHP Enums статусов, Actions/Services, Policies (доступ только владельцу), signing-токены хранятся хешем.
+- Доменный слой: PHP Enums + явная карта переходов статусов, Actions/Services, Policies (управляет только владелец).
+- Подписанты идентифицируются по email (аккаунт необязателен) и опционально связываются с пользователем системы.
+- При отправке приглашения уходят подписантам на email (локально — Mailpit); отправителю signing-токены не возвращаются, хранятся только хешем и со сроком жизни.
 - API endpoint `GET /api/v1/health`.
 - Интерактивная API-документация (OpenAPI/Swagger) на `/docs/api`, генерируется из кода.
 - Базовый frontend-экран с проверкой API health.
@@ -78,6 +80,7 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | GET | `/api/v1/documents/{document}/events` | Bearer | История статусов |
 
 После `make fresh` доступен демо-пользователь: `owner@docsign.test` / `password`.
+Ссылки на подписание после `send` приходят подписантам в Mailpit (http://localhost:8025).
 
 ## Архитектура
 
@@ -113,5 +116,5 @@ npm run build
 
 - Это demo project, не юридически значимая система ЭЦП.
 - Пока нет публичного подписания по токену, outbox publisher и audit writer - они добавляются следующими шагами.
-- Email/SMS не отправляются наружу; для будущих demo-уведомлений подготовлен Mailpit.
+- Приглашения на подписание уходят в Mailpit (локально); наружу реальная почта/SMS не отправляются.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.

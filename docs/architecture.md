@@ -25,10 +25,26 @@ Policies). Tables: `documents`, `document_parties`, `signature_tokens`, `signatu
 
 Each lifecycle action is a single-purpose class (`CreateDocumentAction`, `AddDocumentPartyAction`,
 `SendDocumentAction`, `CancelDocumentAction`, …). Status changes go through `DocumentStatusService`,
-which updates the document and appends a `document_status_history` row inside the same transaction.
-Access is owner-only via `DocumentPolicy`. Parties can only change while the document is a draft;
-`send` issues a signing token per party — the plain token is returned once and only its SHA-256
-hash is stored, ready for the public signing flow.
+which validates the move against an explicit transition map (`DocumentStatus::allowedTransitions()`),
+updates the document and appends a `document_status_history` row inside the same transaction —
+so a status can never be "skipped".
+
+**Roles & access.** The document owner is the only actor who manages the document (CRUD, parties,
+send, cancel) — enforced by `DocumentPolicy`. Parties are the people who sign or view: they are
+identified by name + email (a signer does not need an account), and are optionally linked to a
+registered `User` (`document_parties.user_id`) when their email matches one. A document can only be
+sent if it has at least one signer.
+
+**Signing tokens.** `send` issues one signing token per signer; only its SHA-256 hash is stored.
+The plain token is never returned to the sender — it is delivered to each signer's own email
+(Mailpit in dev) through a `SigningInvitationNotifier`. Tokens always get an expiry
+(`docsign.signing_token_ttl_days`, or the document's own `expires_at`).
+
+**Decoupling seam.** `SendDocumentAction` raises a domain event `DocumentSent` after commit; the
+`SendSigningInvitations` listener delivers invitations via the `SigningInvitationNotifier` contract
+(infra implementation: `MailSigningInvitationNotifier`). This is the seam where the RabbitMQ outbox
+and audit writers will hook in (Этап 5) without touching the action — and the boundary along which
+notifications/audit could later move into separate services.
 
 ## Authentication
 
@@ -64,3 +80,22 @@ document.sent.v1
 document.signed.v1
 document.completed.v1
 ```
+
+## Towards services (future-proofing)
+
+The monolith is organised as bounded contexts under `app/Domain/<Context>` (today: `Documents`,
+`Users`). The rules that keep them splittable later:
+
+- Cross-context side effects go through **domain events** + **contracts (interfaces)**, never direct
+  calls into another context's internals. `SendDocumentAction → DocumentSent → SigningInvitationNotifier`
+  is the first example; notifications and audit will attach the same way.
+- Anything crossing a process boundary is described by a **versioned contract** in
+  `contracts/events/v1` (payload shapes, routing keys with a `.vN` suffix), not by serialized models.
+- Infrastructure (mail, queue, storage) lives in `app/Infrastructure` behind domain contracts, so an
+  implementation can be swapped for a remote service without touching the domain.
+
+Likely evolution: extract `contracts/` into a shared package consumed by every service; move
+`notifications`/`audit` consumers out as independent services around RabbitMQ. Synchronous internal
+calls (e.g. a Go signature-verification service) could expose **gRPC** generated from the same
+contracts — async events stay the default, gRPC only where a typed low-latency request/response is
+actually needed.

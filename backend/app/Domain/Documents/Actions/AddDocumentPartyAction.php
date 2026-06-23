@@ -6,6 +6,7 @@ use App\Domain\Documents\Enums\PartyStatus;
 use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Models\DocumentParty;
+use App\Models\User;
 
 class AddDocumentPartyAction
 {
@@ -20,6 +21,9 @@ class AddDocumentPartyAction
 
         /** @var DocumentParty $party */
         $party = $document->parties()->create([
+            // Участник идентифицируется по email; если в системе уже есть пользователь
+            // с таким email — связываем, но аккаунт для подписания не обязателен.
+            'user_id' => User::where('email', $data['email'])->value('id'),
             'name' => $data['name'],
             'email' => $data['email'],
             'role' => $data['role'] ?? 'signer',

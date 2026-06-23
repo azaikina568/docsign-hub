@@ -2,7 +2,10 @@
 
 namespace App\Domain\Documents\Actions;
 
+use App\Domain\Documents\Data\SigningInvitation;
 use App\Domain\Documents\Enums\DocumentStatus;
+use App\Domain\Documents\Enums\PartyRole;
+use App\Domain\Documents\Events\DocumentSent;
 use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Services\DocumentStatusService;
@@ -15,12 +18,10 @@ class SendDocumentAction
     public function __construct(private readonly DocumentStatusService $statusService) {}
 
     /**
-     * Переводит документ из draft в pending и выдаёт signing-токены участникам.
-     * Возвращает plain-токены (party_id => token) — единственный раз, для demo-уведомления.
-     *
-     * @return array<int, string>
+     * Переводит документ из draft в pending, выдаёт signing-токены подписантам
+     * и публикует событие DocumentSent (приглашения уходят участникам, не отправителю).
      */
-    public function execute(Document $document, User $actor): array
+    public function execute(Document $document, User $actor): Document
     {
         if (! $document->status->isDraft()) {
             throw new DocumentStateException('Only draft documents can be sent.');
@@ -28,27 +29,37 @@ class SendDocumentAction
 
         $document->loadMissing('parties');
 
-        if ($document->parties->isEmpty()) {
-            throw new DocumentStateException('Add at least one party before sending the document.');
+        $signers = $document->parties->where('role', PartyRole::Signer);
+
+        if ($signers->isEmpty()) {
+            throw new DocumentStateException('Add at least one signer before sending the document.');
         }
 
-        return DB::transaction(function () use ($document, $actor) {
-            $plainTokens = [];
+        $ttl = now()->addDays((int) config('docsign.signing_token_ttl_days'));
+        $expiresAt = $document->expires_at ?? $ttl;
 
-            foreach ($document->parties as $party) {
+        $invitations = DB::transaction(function () use ($document, $actor, $signers, $expiresAt) {
+            $invitations = [];
+
+            foreach ($signers as $party) {
                 $plain = Str::random(40);
 
                 $party->signatureToken()->create([
                     'token_hash' => hash('sha256', $plain),
-                    'expires_at' => $document->expires_at,
+                    'expires_at' => $expiresAt,
                 ]);
 
-                $plainTokens[$party->id] = $plain;
+                $invitations[] = new SigningInvitation($party, $plain);
             }
 
             $this->statusService->transition($document, DocumentStatus::Pending, $actor, 'Document sent for signing.');
 
-            return $plainTokens;
+            return $invitations;
         });
+
+        // Приглашения рассылаем после коммита: сбой доставки не должен откатывать отправку.
+        DocumentSent::dispatch($document, $invitations);
+
+        return $document;
     }
 }

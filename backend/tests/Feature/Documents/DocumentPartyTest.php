@@ -72,6 +72,47 @@ class DocumentPartyTest extends TestCase
         $this->deleteJson("/api/v1/documents/{$documentA->id}/parties/{$party->id}")->assertNotFound();
     }
 
+    public function test_duplicate_party_email_is_rejected(): void
+    {
+        $user = User::factory()->create();
+        $document = Document::factory()->create(['owner_id' => $user->id]);
+        DocumentParty::factory()->create(['document_id' => $document->id, 'email' => 'dup@example.com']);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+            'name' => 'Duplicate',
+            'email' => 'dup@example.com',
+        ])->assertStatus(422)->assertJsonValidationErrors('email');
+    }
+
+    public function test_party_is_linked_to_registered_user_by_email(): void
+    {
+        $owner = User::factory()->create();
+        $signerAccount = User::factory()->create(['email' => 'member@example.com']);
+        $document = Document::factory()->create(['owner_id' => $owner->id]);
+
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+            'name' => 'Member',
+            'email' => 'member@example.com',
+        ])->assertCreated();
+        $this->assertDatabaseHas('document_parties', [
+            'email' => 'member@example.com',
+            'user_id' => $signerAccount->id,
+        ]);
+
+        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+            'name' => 'Outsider',
+            'email' => 'outsider@example.com',
+        ])->assertCreated();
+        $this->assertDatabaseHas('document_parties', [
+            'email' => 'outsider@example.com',
+            'user_id' => null,
+        ]);
+    }
+
     public function test_cannot_add_party_to_foreign_document(): void
     {
         $owner = User::factory()->create();
