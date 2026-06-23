@@ -22,7 +22,7 @@ class DocumentCrudTest extends TestCase
     public function test_owner_can_create_document_as_draft_with_history(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $response = $this->postJson('/api/v1/documents', ['title' => 'Service contract']);
 
@@ -44,7 +44,7 @@ class DocumentCrudTest extends TestCase
 
     public function test_create_document_requires_title(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['access-api']);
 
         $this->postJson('/api/v1/documents', [])
             ->assertStatus(422)
@@ -58,7 +58,7 @@ class DocumentCrudTest extends TestCase
         Document::factory()->create(['owner_id' => $user->id]);
         Document::factory()->create(['owner_id' => $other->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->getJson('/api/v1/documents')
             ->assertOk()
@@ -70,7 +70,7 @@ class DocumentCrudTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->getJson("/api/v1/documents/{$document->ulid}")
             ->assertOk()
@@ -82,7 +82,7 @@ class DocumentCrudTest extends TestCase
 
     public function test_unknown_ulid_returns_not_found(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['access-api']);
 
         $this->getJson('/api/v1/documents/'.Str::ulid())->assertNotFound();
     }
@@ -94,7 +94,7 @@ class DocumentCrudTest extends TestCase
         Document::factory()->status(DocumentStatus::Expired)->create(['owner_id' => $user->id]);
         Document::factory()->status(DocumentStatus::Pending)->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->getJson('/api/v1/documents?status=expired')
             ->assertOk()
@@ -104,7 +104,7 @@ class DocumentCrudTest extends TestCase
 
     public function test_index_rejects_invalid_status_filter(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['access-api']);
 
         $this->getJson('/api/v1/documents?status=bogus')
             ->assertStatus(422)
@@ -116,7 +116,7 @@ class DocumentCrudTest extends TestCase
         $owner = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $owner->id]);
 
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['access-api']);
 
         $this->getJson("/api/v1/documents/{$document->ulid}")->assertForbidden();
     }
@@ -126,7 +126,7 @@ class DocumentCrudTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->patchJson("/api/v1/documents/{$document->ulid}", ['title' => 'Renamed'])
             ->assertOk()
@@ -138,7 +138,7 @@ class DocumentCrudTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->status(DocumentStatus::Pending)->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->patchJson("/api/v1/documents/{$document->ulid}", ['title' => 'Nope'])
             ->assertStatus(409);
@@ -147,7 +147,7 @@ class DocumentCrudTest extends TestCase
     public function test_draft_can_be_deleted_but_sent_cannot(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $draft = Document::factory()->create(['owner_id' => $user->id]);
         $this->deleteJson("/api/v1/documents/{$draft->ulid}")->assertOk();

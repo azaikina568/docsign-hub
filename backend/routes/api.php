@@ -19,9 +19,11 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->middleware('throttle:auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login', [AuthController::class, 'login']);
+        // Refresh ходит под своим ability: access-токен сюда не подойдёт, refresh — не подойдёт в API.
+        Route::post('refresh', [AuthController::class, 'refresh'])->middleware(['auth:sanctum', 'abilities:issue-access']);
     });
 
-    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+    Route::middleware(['auth:sanctum', 'abilities:access-api', 'throttle:api'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
 

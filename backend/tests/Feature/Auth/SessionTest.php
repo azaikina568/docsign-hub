@@ -19,7 +19,7 @@ class SessionTest extends TestCase
     public function test_authenticated_user_can_fetch_profile(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->getJson('/api/v1/me')
             ->assertOk()
@@ -37,10 +37,11 @@ class SessionTest extends TestCase
         $token = $this->postJson('/api/v1/auth/login', [
             'email' => 'jane@example.com',
             'password' => 'password123',
-        ])->json('token');
+        ])->json('tokens.access_token');
 
         $this->withToken($token)->postJson('/api/v1/auth/logout')->assertOk();
 
+        // logout рвёт всю семью: и access, и refresh.
         $this->assertDatabaseCount('personal_access_tokens', 0);
 
         // Сбрасываем кеш resolved-пользователя в guard, чтобы следующий запрос

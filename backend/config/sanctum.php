@@ -54,6 +54,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Access / Refresh Token TTLs
+    |--------------------------------------------------------------------------
+    |
+    | Per-token lifetimes (minutes) for our access + refresh pair. We set them
+    | per token (not via the global "expiration" above, which would apply one
+    | TTL to every token): a short-lived access token and a long-lived refresh.
+    |
+    */
+
+    'access_token_expiration' => (int) env('AUTH_ACCESS_TOKEN_TTL', 60),
+
+    'refresh_token_expiration' => (int) env('AUTH_REFRESH_TOKEN_TTL', 60 * 24 * 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | Token Prefix
     |--------------------------------------------------------------------------
     |

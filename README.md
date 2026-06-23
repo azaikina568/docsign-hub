@@ -17,6 +17,7 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Laravel 12 в `backend/`.
 - Vue 3 + TypeScript + Vite в `frontend/`.
 - Аутентификация по токенам (Laravel Sanctum): регистрация, логин, логаут, профиль.
+- Пара токенов access + refresh: короткий access для API, долгий refresh для обновления; `/auth/refresh` ротирует refresh с детекцией переиспользования (отзыв всей сессии), `logout` рвёт обе стороны. Access и refresh невзаимозаменяемы (token abilities).
 - Rate limit на auth-endpoints и на всём аутентифицированном API, пароли хешируются, токены хранятся только хешем.
 - Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов (пагинация + сортировка).
 - Документ адресуется в API по публичному ULID (а не по внутреннему числовому id).
@@ -70,10 +71,11 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | Method | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
 | GET | `/api/v1/health` | — | Проверка доступности API |
-| POST | `/api/v1/auth/register` | — | Регистрация, возвращает Bearer-токен |
-| POST | `/api/v1/auth/login` | — | Логин, возвращает Bearer-токен |
-| POST | `/api/v1/auth/logout` | Bearer | Отзыв текущего токена |
-| GET | `/api/v1/me` | Bearer | Текущий пользователь |
+| POST | `/api/v1/auth/register` | — | Регистрация, возвращает пару access + refresh |
+| POST | `/api/v1/auth/login` | — | Логин, возвращает пару access + refresh |
+| POST | `/api/v1/auth/refresh` | Bearer (refresh) | Обменять refresh на новую пару (ротация + reuse-detection) |
+| POST | `/api/v1/auth/logout` | Bearer (access) | Отзыв всей сессии (access + refresh) |
+| GET | `/api/v1/me` | Bearer (access) | Текущий пользователь |
 | GET | `/api/v1/documents` | Bearer | Список документов владельца (пагинация; фильтр `?status=`) |
 | POST | `/api/v1/documents` | Bearer | Создать документ (draft) |
 | GET | `/api/v1/documents/{document}` | Bearer | Документ с участниками |
@@ -86,6 +88,8 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | GET | `/api/v1/documents/{document}/events` | Bearer | История статусов (пагинация; `?sort=asc` для хронологии) |
 
 `{document}` — публичный ULID документа (поле `id` в ответе), не внутренний числовой id.
+
+`register`/`login`/`refresh` возвращают `{ user, tokens: { token_type, access_token, access_expires_at, refresh_token, refresh_expires_at } }`. Для API шлём `Authorization: Bearer <access_token>`, для `/auth/refresh` — `Bearer <refresh_token>`.
 
 После `make fresh` доступен демо-пользователь: `owner@docsign.test` / `password`.
 Ссылки на подписание после `send` приходят подписантам в Mailpit (http://localhost:8025).

@@ -25,7 +25,7 @@ class DocumentWorkflowTest extends TestCase
         $document = Document::factory()->create(['owner_id' => $user->id]);
         $party = DocumentParty::factory()->create(['document_id' => $document->id, 'email' => 'signer@example.com']);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $response = $this->postJson("/api/v1/documents/{$document->ulid}/send");
 
@@ -57,7 +57,7 @@ class DocumentWorkflowTest extends TestCase
         Notification::fake();
 
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         // Без явного expires_at — проставляется дефолтный TTL, и документ становится способным истечь.
         $auto = Document::factory()->create(['owner_id' => $user->id, 'expires_at' => null]);
@@ -86,7 +86,7 @@ class DocumentWorkflowTest extends TestCase
             'role' => PartyRole::Viewer,
         ]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/send")->assertStatus(409);
     }
@@ -96,7 +96,7 @@ class DocumentWorkflowTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->status(DocumentStatus::Pending)->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/cancel", ['reason' => 'No longer needed'])
             ->assertOk()
@@ -114,7 +114,7 @@ class DocumentWorkflowTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->status(DocumentStatus::Signed)->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/cancel")->assertStatus(409);
     }
@@ -122,7 +122,7 @@ class DocumentWorkflowTest extends TestCase
     public function test_events_endpoint_returns_status_history(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $ulid = $this->postJson('/api/v1/documents', ['title' => 'Tracked'])->json('data.id');
 
@@ -136,7 +136,7 @@ class DocumentWorkflowTest extends TestCase
         Notification::fake();
 
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         // Создаём через API, чтобы в истории появилась запись draft, затем send добавляет pending.
         $ulid = $this->postJson('/api/v1/documents', ['title' => 'Tracked'])->json('data.id');

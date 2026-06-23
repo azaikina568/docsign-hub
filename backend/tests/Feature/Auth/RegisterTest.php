@@ -22,7 +22,11 @@ class RegisterTest extends TestCase
 
         $response
             ->assertCreated()
-            ->assertJsonStructure(['message', 'token', 'user' => ['id', 'name', 'email', 'created_at']])
+            ->assertJsonStructure([
+                'message',
+                'user' => ['id', 'name', 'email', 'created_at'],
+                'tokens' => ['token_type', 'access_token', 'access_expires_at', 'refresh_token', 'refresh_expires_at'],
+            ])
             ->assertJsonPath('user.email', 'jane@example.com');
 
         $this->assertDatabaseHas('users', ['email' => 'jane@example.com']);

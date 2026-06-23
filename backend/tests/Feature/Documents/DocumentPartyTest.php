@@ -19,7 +19,7 @@ class DocumentPartyTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Alice Carter',
@@ -40,7 +40,7 @@ class DocumentPartyTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->status(DocumentStatus::Pending)->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Late Party',
@@ -54,7 +54,7 @@ class DocumentPartyTest extends TestCase
         $document = Document::factory()->create(['owner_id' => $user->id]);
         $party = DocumentParty::factory()->create(['document_id' => $document->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->deleteJson("/api/v1/documents/{$document->ulid}/parties/{$party->id}")->assertOk();
         $this->assertDatabaseMissing('document_parties', ['id' => $party->id]);
@@ -67,7 +67,7 @@ class DocumentPartyTest extends TestCase
         $documentB = Document::factory()->create(['owner_id' => $user->id]);
         $party = DocumentParty::factory()->create(['document_id' => $documentB->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->deleteJson("/api/v1/documents/{$documentA->ulid}/parties/{$party->id}")->assertNotFound();
     }
@@ -77,7 +77,7 @@ class DocumentPartyTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $user->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Signer', 'email' => 'signer@example.com', 'signing_order' => 2,
@@ -96,7 +96,7 @@ class DocumentPartyTest extends TestCase
         $document = Document::factory()->create(['owner_id' => $user->id]);
         DocumentParty::factory()->create(['document_id' => $document->id, 'email' => 'dup@example.com']);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Duplicate',
@@ -110,7 +110,7 @@ class DocumentPartyTest extends TestCase
         $signerAccount = User::factory()->create(['email' => 'member@example.com']);
         $document = Document::factory()->create(['owner_id' => $owner->id]);
 
-        Sanctum::actingAs($owner);
+        Sanctum::actingAs($owner, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Member',
@@ -136,7 +136,7 @@ class DocumentPartyTest extends TestCase
         $owner = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $owner->id]);
 
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Intruder',

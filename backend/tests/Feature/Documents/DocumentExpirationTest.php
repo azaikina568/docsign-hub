@@ -43,7 +43,7 @@ class DocumentExpirationTest extends TestCase
         $user = User::factory()->create();
         $document = Document::factory()->create(['owner_id' => $user->id, 'expires_at' => null]);
         DocumentParty::factory()->create(['document_id' => $document->id]);
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['access-api']);
 
         $this->postJson("/api/v1/documents/{$document->ulid}/send")->assertOk();
 

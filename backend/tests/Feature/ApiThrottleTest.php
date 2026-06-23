@@ -13,7 +13,7 @@ class ApiThrottleTest extends TestCase
 
     public function test_authenticated_api_is_rate_limited(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['access-api']);
 
         for ($i = 0; $i < 60; $i++) {
             $this->getJson('/api/v1/me')->assertOk();

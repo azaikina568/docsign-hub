@@ -5,7 +5,18 @@ Mermaid-диаграммы. Рендерятся прямо на GitHub, а ло
 синхроне с кодом: схема БД — с миграциями, state machine — с `DocumentStatus::allowedTransitions()`,
 sequence — с `SendDocumentAction` и листенерами.
 
+Каждый раздел: сначала «что показывает», затем сама диаграмма, при необходимости — «как читать».
+Содержание: [ERD](#схема-данных-erd) · [статусы документа](#жизненный-цикл-документа-state-machine) ·
+[отправка на подписание](#отправка-на-подписание-sequence) · [обновление токенов](#обновление-токенов-sequence) ·
+[развёртывание](#развёртывание-контейнеры) · [события и очереди](#события-и-очереди-план-этап-5).
+
 ## Схема данных (ERD)
+
+**Что показывает:** таблицы домена и связи между ними (что на что ссылается).
+
+**Как читать** (нотация «crow's-foot» у концов связи): `||` — ровно один, `o{` — ноль или много,
+`o|` — ноль или один. Пример: «один `documents` → ноль-или-много `document_parties`». `PK` — первичный ключ,
+`FK` — внешний, `UK` — уникальный. В кавычках у поля — короткий комментарий.
 
 ```mermaid
 erDiagram
@@ -73,7 +84,9 @@ erDiagram
 
 ## Жизненный цикл документа (state machine)
 
-Источник истины — `DocumentStatus::allowedTransitions()`; переходы пишутся в `document_status_history`.
+**Что показывает:** допустимые статусы документа и переходы между ними. `signed`/`cancelled`/`expired` —
+терминальные (исходящих стрелок нет). Источник истины — `DocumentStatus::allowedTransitions()`; каждый
+переход пишется в `document_status_history`.
 
 ```mermaid
 stateDiagram-v2
@@ -93,6 +106,9 @@ stateDiagram-v2
 ```
 
 ## Отправка на подписание (sequence)
+
+**Что показывает:** что происходит по `POST /documents/{ulid}/send` — от запроса владельца до письма
+подписанту. Голубая рамка — одна транзакция БД (всё внутри либо коммитится, либо откатывается вместе).
 
 ```mermaid
 sequenceDiagram
@@ -126,7 +142,38 @@ sequenceDiagram
 Plain-токен живёт только в памяти (`SigningInvitation`) и уходит подписанту письмом; отправителю не
 возвращается. Рассылка — после commit, чтобы сбой доставки не откатывал отправку.
 
+## Обновление токенов (sequence)
+
+**Что показывает:** обмен refresh-токена на новую пару с ротацией и детекцией переиспользования
+(`POST /auth/refresh`). Access живёт коротко, refresh — долго; оба связаны «семьёй» (`family`).
+Источник истины — `RefreshTokensAction`.
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant API as AuthController /auth/refresh
+    participant Act as RefreshTokensAction
+    participant DB as personal_access_tokens
+
+    Client->>API: POST /auth/refresh (Bearer refresh, ability issue-access)
+    API->>Act: execute(user, refresh)
+    alt refresh уже использован (consumed)
+        Act->>DB: удалить всю семью family
+        Act-->>Client: 401, сессия отозвана (возможна кража)
+    else первое использование
+        Act->>DB: пометить refresh consumed, удалить старый access семьи
+        Act->>DB: выдать новую пару access и refresh в той же family
+        Act-->>Client: 200 новая пара
+    end
+```
+
+Access-токен ходит в API (ability `access-api`), refresh — только на `/auth/refresh` (ability
+`issue-access`); они невзаимозаменяемы. `logout` и детекция переиспользования гасят всю семью.
+
 ## Развёртывание (контейнеры)
+
+**Что показывает:** какие контейнеры есть и кто с кем общается. Сплошные стрелки — текущий рантайм,
+пунктир — dev-почта и заготовки под Этап 5.
 
 ```mermaid
 flowchart LR
@@ -142,11 +189,10 @@ flowchart LR
     backend -.->|stage 5| mongodb[("MongoDB: audit")]
 ```
 
-Сплошные стрелки — текущий рантайм; пунктир — dev-почта и заготовки под Этап 5.
-
 ## События и очереди (план, Этап 5)
 
-Транзакционный outbox → publisher → RabbitMQ topic → consumers.
+**Что показывает:** будущий путь доменного события (ещё не реализовано). Транзакционный outbox → publisher
+→ RabbitMQ topic → consumers (уведомления и audit), с dead-letter очередью для разбора сбоев.
 
 ```mermaid
 flowchart LR

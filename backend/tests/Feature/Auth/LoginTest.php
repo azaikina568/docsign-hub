@@ -24,7 +24,11 @@ class LoginTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonStructure(['message', 'token', 'user' => ['id', 'name', 'email']])
+            ->assertJsonStructure([
+                'message',
+                'user' => ['id', 'name', 'email'],
+                'tokens' => ['token_type', 'access_token', 'access_expires_at', 'refresh_token', 'refresh_expires_at'],
+            ])
             ->assertJsonPath('user.email', 'jane@example.com');
     }
 

@@ -82,10 +82,24 @@ notifications/audit could later move into separate services.
 ## Authentication
 
 The API uses Laravel Sanctum personal access tokens (Bearer). Public `auth/register` and
-`auth/login` endpoints are rate limited per IP (`throttle:auth`, 10/min); they return a plain-text
-token once, and only its hash is stored. Protected endpoints sit behind the `auth:sanctum` guard and
-a general `throttle:api` limiter (60/min, keyed by user id, falling back to IP), and `auth/logout`
-revokes the current token. All `api/*` responses, including errors, are rendered as JSON.
+`auth/login` endpoints are rate limited per IP (`throttle:auth`, 10/min); only token hashes are
+stored. Protected endpoints sit behind the `auth:sanctum` guard and a general `throttle:api` limiter
+(60/min, keyed by user id, falling back to IP). All `api/*` responses, including errors, are JSON.
+
+**Access + refresh tokens.** `register`/`login` issue a pair: a short-lived **access** token
+(ability `access-api`, TTL `sanctum.access_token_expiration`) for the API, and a long-lived
+**refresh** token (ability `issue-access`, TTL `sanctum.refresh_token_expiration`) used only at
+`POST /auth/refresh`. The abilities make them non-interchangeable: a refresh token is rejected by the
+API group (`abilities:access-api`), and an access token is rejected by the refresh route
+(`abilities:issue-access`). Per-token TTLs are set explicitly (not via Sanctum's global `expiration`,
+which would apply one TTL to all tokens).
+
+A pair shares a `family` (uuid column on `personal_access_tokens`, custom `PersonalAccessToken`
+model). `RefreshTokensAction` rotates the refresh: it marks the presented one `consumed_at`, deletes
+the family's old access, and issues a new pair in the same family. **Reuse detection:** presenting an
+already-consumed refresh means it was likely stolen — the whole family is revoked and the request
+gets 401. `logout` also deletes the whole family (access + refresh). Expired/rotated tokens are
+pruned daily by the scheduled `sanctum:prune-expired`.
 
 ## API documentation
 
