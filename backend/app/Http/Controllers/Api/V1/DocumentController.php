@@ -7,6 +7,7 @@ use App\Domain\Documents\Actions\DeleteDocumentAction;
 use App\Domain\Documents\Actions\UpdateDocumentAction;
 use App\Domain\Documents\Models\Document;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Documents\IndexDocumentRequest;
 use App\Http\Requests\Documents\StoreDocumentRequest;
 use App\Http\Requests\Documents\UpdateDocumentRequest;
 use App\Http\Resources\DocumentResource;
@@ -20,12 +21,14 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 class DocumentController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(IndexDocumentRequest $request): AnonymousResourceCollection
     {
         $documents = $request->user()->documents()
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->withCount('parties')
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return DocumentResource::collection($documents);
     }

@@ -87,6 +87,30 @@ class DocumentCrudTest extends TestCase
         $this->getJson('/api/v1/documents/'.Str::ulid())->assertNotFound();
     }
 
+    public function test_index_can_filter_by_status(): void
+    {
+        $user = User::factory()->create();
+        Document::factory()->create(['owner_id' => $user->id]);
+        Document::factory()->status(DocumentStatus::Expired)->create(['owner_id' => $user->id]);
+        Document::factory()->status(DocumentStatus::Pending)->create(['owner_id' => $user->id]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/documents?status=expired')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.status', 'expired');
+    }
+
+    public function test_index_rejects_invalid_status_filter(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson('/api/v1/documents?status=bogus')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('status');
+    }
+
     public function test_owner_cannot_view_foreign_document(): void
     {
         $owner = User::factory()->create();
