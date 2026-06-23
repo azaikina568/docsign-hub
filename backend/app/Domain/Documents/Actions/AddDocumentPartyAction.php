@@ -2,6 +2,7 @@
 
 namespace App\Domain\Documents\Actions;
 
+use App\Domain\Documents\Enums\PartyRole;
 use App\Domain\Documents\Enums\PartyStatus;
 use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
@@ -19,18 +20,19 @@ class AddDocumentPartyAction
             throw new DocumentStateException('Parties can only be changed while the document is a draft.');
         }
 
-        /** @var DocumentParty $party */
-        $party = $document->parties()->create([
+        $role = PartyRole::from($data['role'] ?? PartyRole::Signer->value);
+
+        return DocumentParty::create([
+            'document_id' => $document->id,
             // Участник идентифицируется по email; если в системе уже есть пользователь
             // с таким email — связываем, но аккаунт для подписания не обязателен.
             'user_id' => User::where('email', $data['email'])->value('id'),
             'name' => $data['name'],
             'email' => $data['email'],
-            'role' => $data['role'] ?? 'signer',
-            'signing_order' => $data['signing_order'] ?? 1,
+            'role' => $role,
+            // Порядок подписания актуален только для подписантов; у наблюдателей он null.
+            'signing_order' => $role === PartyRole::Signer ? ($data['signing_order'] ?? 1) : null,
             'status' => PartyStatus::Pending,
         ]);
-
-        return $party;
     }
 }

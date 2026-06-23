@@ -5,6 +5,7 @@ namespace App\Domain\Documents\Services;
 use App\Domain\Documents\Enums\DocumentStatus;
 use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
+use App\Domain\Documents\Models\DocumentStatusHistory;
 use App\Models\User;
 
 class DocumentStatusService
@@ -29,7 +30,8 @@ class DocumentStatusService
 
         $document->save();
 
-        $document->statusHistory()->create([
+        DocumentStatusHistory::create([
+            'document_id' => $document->id,
             'from_status' => $from,
             'to_status' => $to,
             'reason' => $reason,

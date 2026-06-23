@@ -72,6 +72,24 @@ class DocumentPartyTest extends TestCase
         $this->deleteJson("/api/v1/documents/{$documentA->id}/parties/{$party->id}")->assertNotFound();
     }
 
+    public function test_signing_order_applies_to_signers_not_viewers(): void
+    {
+        $user = User::factory()->create();
+        $document = Document::factory()->create(['owner_id' => $user->id]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+            'name' => 'Signer', 'email' => 'signer@example.com', 'signing_order' => 2,
+        ])->assertCreated()->assertJsonPath('data.signing_order', 2);
+
+        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+            'name' => 'Viewer', 'email' => 'viewer@example.com', 'role' => 'viewer', 'signing_order' => 3,
+        ])->assertCreated()->assertJsonPath('data.signing_order', null);
+
+        $this->assertDatabaseHas('document_parties', ['email' => 'viewer@example.com', 'signing_order' => null]);
+    }
+
     public function test_duplicate_party_email_is_rejected(): void
     {
         $user = User::factory()->create();

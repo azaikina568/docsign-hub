@@ -20,7 +20,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $email
  * @property PartyRole $role
- * @property int $signing_order
+ * @property int|null $signing_order
  * @property PartyStatus $status
  * @property Carbon|null $signed_at
  */

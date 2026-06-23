@@ -8,6 +8,7 @@ use App\Domain\Documents\Enums\PartyRole;
 use App\Domain\Documents\Events\DocumentSent;
 use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
+use App\Domain\Documents\Models\SignatureToken;
 use App\Domain\Documents\Services\DocumentStatusService;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,8 @@ class SendDocumentAction
             foreach ($signers as $party) {
                 $plain = Str::random(40);
 
-                $party->signatureToken()->create([
+                SignatureToken::create([
+                    'document_party_id' => $party->id,
                     'token_hash' => hash('sha256', $plain),
                     'expires_at' => $expiresAt,
                 ]);

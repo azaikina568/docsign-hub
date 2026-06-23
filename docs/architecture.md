@@ -29,11 +29,23 @@ which validates the move against an explicit transition map (`DocumentStatus::al
 updates the document and appends a `document_status_history` row inside the same transaction —
 so a status can never be "skipped".
 
-**Roles & access.** The document owner is the only actor who manages the document (CRUD, parties,
-send, cancel) — enforced by `DocumentPolicy`. Parties are the people who sign or view: they are
-identified by name + email (a signer does not need an account), and are optionally linked to a
-registered `User` (`document_parties.user_id`) when their email matches one. A document can only be
-sent if it has at least one signer.
+**Roles & access.** Two distinct concepts. The **owner** manages the document (CRUD, parties, send,
+cancel) — enforced by `DocumentPolicy`. **Parties** are the people involved per document, with a
+`role`: a `signer` signs (and has a `signing_order` for sequential signing), a `viewer` only reads
+(`signing_order` is null — it is meaningless for viewers). Parties are identified by name + email (a
+signer does not need an account) and are optionally linked to a registered `User`
+(`document_parties.user_id`) when their email matches one. A document can only be sent if it has at
+least one signer.
+
+Access uses one consistent model — **identity or capability**. Identity = an authenticated `User`
+(Sanctum), used for owner actions and for parties that are linked to an account. Capability = a
+single-use signing token delivered to a party's email, used by parties without an account. The
+upcoming signing flow combines them: an account-bound party must be authenticated as that user
+(a leaked token alone is not enough), while an email-only party signs by possession of the token.
+
+**content_hash.** Reserved for signing integrity: at `send` it will be set to a hash of the
+signable snapshot (today: title + ordered parties; later: the uploaded file), and each signature
+binds to it so later edits are detectable. It is not populated yet (signing flow).
 
 **Signing tokens.** `send` issues one signing token per signer; only its SHA-256 hash is stored.
 The plain token is never returned to the sender — it is delivered to each signer's own email
