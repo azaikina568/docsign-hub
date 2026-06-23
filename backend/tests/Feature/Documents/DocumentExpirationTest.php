@@ -4,8 +4,11 @@ namespace Tests\Feature\Documents;
 
 use App\Domain\Documents\Enums\DocumentStatus;
 use App\Domain\Documents\Models\Document;
+use App\Domain\Documents\Models\DocumentParty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class DocumentExpirationTest extends TestCase
@@ -31,6 +34,26 @@ class DocumentExpirationTest extends TestCase
                 'changed_by_user_id' => null,
             ]);
         }
+    }
+
+    public function test_document_sent_without_deadline_expires_after_default_ttl(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        $document = Document::factory()->create(['owner_id' => $user->id, 'expires_at' => null]);
+        DocumentParty::factory()->create(['document_id' => $document->id]);
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/v1/documents/{$document->ulid}/send")->assertOk();
+
+        $ttl = (int) config('docsign.signing_token_ttl_days');
+        $this->travelTo(now()->addDays($ttl + 1));
+
+        $this->artisan('documents:expire')->assertSuccessful();
+        $this->assertDatabaseHas('documents', ['id' => $document->id, 'status' => 'expired']);
+
+        $this->travelBack();
     }
 
     public function test_expire_command_ignores_future_and_final_documents(): void

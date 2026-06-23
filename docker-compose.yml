@@ -20,6 +20,25 @@ services:
       mailpit:
         condition: service_started
 
+  # Планировщик Laravel: отдельный долгоживущий процесс schedule:work.
+  # В проде держим ровно один инстанс (иначе задачи задвоятся); сам код задач
+  # дополнительно прикрыт onOneServer() через Redis-lock.
+  scheduler:
+    build:
+      context: ./infra/docker/php
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/var/www/html
+    # Ждём, пока backend поставит зависимости в общий том, и запускаем планировщик.
+    command: sh -c "until [ -f vendor/autoload.php ]; do sleep 2; done; php artisan schedule:work"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   nginx:
     image: nginx:1.27-alpine
     ports:

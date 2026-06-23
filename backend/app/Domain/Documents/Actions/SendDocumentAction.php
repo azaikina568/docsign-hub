@@ -36,10 +36,14 @@ class SendDocumentAction
             throw new DocumentStateException('Add at least one signer before sending the document.');
         }
 
-        $ttl = now()->addDays((int) config('docsign.signing_token_ttl_days'));
-        $expiresAt = $document->expires_at ?? $ttl;
+        // Дедлайн один на документ и его токены. Если владелец не задал expires_at —
+        // берём дефолтный TTL и фиксируем его на документе, иначе documents:expire
+        // никогда не закроет заброшенный документ (фильтр по expires_at).
+        $deadline = $document->expires_at ?? now()->addDays((int) config('docsign.signing_token_ttl_days'));
 
-        $invitations = DB::transaction(function () use ($document, $actor, $signers, $expiresAt) {
+        $invitations = DB::transaction(function () use ($document, $actor, $signers, $deadline) {
+            $document->expires_at = $deadline;
+
             $invitations = [];
 
             foreach ($signers as $party) {
@@ -48,12 +52,13 @@ class SendDocumentAction
                 SignatureToken::create([
                     'document_party_id' => $party->id,
                     'token_hash' => hash('sha256', $plain),
-                    'expires_at' => $expiresAt,
+                    'expires_at' => $deadline,
                 ]);
 
                 $invitations[] = new SigningInvitation($party, $plain);
             }
 
+            // transition() сохраняет документ целиком — вместе с проставленным expires_at.
             $this->statusService->transition($document, DocumentStatus::Pending, $actor, 'Document sent for signing.');
 
             return $invitations;

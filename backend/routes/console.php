@@ -8,4 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('documents:expire')->daily();
+// onOneServer: если планировщиков несколько, задачу выполнит только один (Redis-lock).
+Schedule::command('documents:expire')->daily()->onOneServer();

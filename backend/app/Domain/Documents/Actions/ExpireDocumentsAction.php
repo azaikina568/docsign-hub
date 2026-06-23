@@ -15,23 +15,27 @@ class ExpireDocumentsAction
     /**
      * Переводит просроченные документы (в процессе подписания) в статус expired.
      * Каждый документ — в своей транзакции: сбой одного не откатывает остальные.
+     * Идём курсором (lazyById), чтобы не держать весь батч в памяти.
      */
     public function execute(?CarbonInterface $now = null): int
     {
         $now ??= now();
 
-        $documents = Document::query()
+        $expired = 0;
+
+        Document::query()
             ->whereIn('status', [DocumentStatus::Pending, DocumentStatus::PartiallySigned])
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', $now)
-            ->get();
+            ->lazyById()
+            ->each(function (Document $document) use (&$expired): void {
+                DB::transaction(function () use ($document): void {
+                    $this->statusService->transition($document, DocumentStatus::Expired, null, 'Document expired.');
+                });
 
-        foreach ($documents as $document) {
-            DB::transaction(function () use ($document): void {
-                $this->statusService->transition($document, DocumentStatus::Expired, null, 'Document expired.');
+                $expired++;
             });
-        }
 
-        return $documents->count();
+        return $expired;
     }
 }

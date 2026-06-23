@@ -52,6 +52,31 @@ class DocumentWorkflowTest extends TestCase
         );
     }
 
+    public function test_send_sets_document_deadline_matching_token_expiry(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        // Без явного expires_at — проставляется дефолтный TTL, и документ становится способным истечь.
+        $auto = Document::factory()->create(['owner_id' => $user->id, 'expires_at' => null]);
+        DocumentParty::factory()->create(['document_id' => $auto->id]);
+        $this->postJson("/api/v1/documents/{$auto->ulid}/send")->assertOk();
+        $this->assertNotNull($auto->fresh()->expires_at);
+
+        // Явный дедлайн владельца сохраняется и совпадает со сроком токена.
+        $explicit = Document::factory()->create(['owner_id' => $user->id, 'expires_at' => now()->addDays(3)]);
+        $party = DocumentParty::factory()->create(['document_id' => $explicit->id]);
+        $this->postJson("/api/v1/documents/{$explicit->ulid}/send")->assertOk();
+
+        $token = $party->signatureToken()->firstOrFail();
+        $this->assertSame(
+            $explicit->fresh()->expires_at?->toDateTimeString(),
+            $token->expires_at?->toDateTimeString(),
+        );
+    }
+
     public function test_document_without_signers_cannot_be_sent(): void
     {
         $user = User::factory()->create();

@@ -8,7 +8,9 @@ DocSign Hub - демонстрационный сервис для сценар�
 
 - Backend: PHP 8.4 в Docker, Laravel 12, PostgreSQL, Redis, RabbitMQ, MongoDB, Mailpit.
 - Frontend: Vue 3, TypeScript, Vite, Tailwind CSS, TanStack Query, Pinia, shadcn-vue-ready structure.
-- Infra: Docker Compose, nginx, Makefile, PHPUnit, Pint, PHPStan/Larastan, OpenAPI/Swagger (Scramble).
+- Infra: Docker Compose (включая отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint, PHPStan/Larastan, OpenAPI/Swagger (Scramble).
+
+Диаграммы (ERD, машина состояний, sequence отправки, развёртывание): [docs/diagrams.md](docs/diagrams.md).
 
 ## Что реализовано
 
@@ -18,7 +20,8 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Rate limit на auth-endpoints и на всём аутентифицированном API, пароли хешируются, токены хранятся только хешем.
 - Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов (пагинация + сортировка).
 - Документ адресуется в API по публичному ULID (а не по внутреннему числовому id).
-- Авто-экспирация: команда `documents:expire` (по расписанию, ежедневно) переводит просроченные документы в `expired`.
+- Дедлайн документа фиксируется при отправке (явный `expires_at` владельца или дефолтный TTL); на этот же момент истекают signing-токены.
+- Авто-экспирация: команда `documents:expire` под ежедневным расписанием (отдельный scheduler-контейнер) переводит просроченные документы в `expired`.
 - Доменный слой: PHP Enums + явная карта переходов статусов, Actions/Services, Policies (управляет только владелец).
 - Подписанты идентифицируются по email (аккаунт необязателен) и опционально связываются с пользователем системы.
 - При отправке приглашения уходят подписантам на email (локально — Mailpit); отправителю signing-токены не возвращаются, хранятся только хешем и со сроком жизни.
