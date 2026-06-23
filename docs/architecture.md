@@ -4,7 +4,8 @@ DocSign Hub starts as a modular Laravel monolith. The goal is to keep the codeba
 
 ## Runtime
 
-Diagrams (ERD, state machine, send sequence, deployment, messaging): [diagrams.md](diagrams.md).
+Diagrams (ERD, state machine, send sequence, deployment, messaging): [diagrams.md](diagrams.md) —
+rendered on GitHub and served in-app at `/docs/diagrams` (same file via mermaid.js).
 
 - `nginx` serves the Laravel API through PHP-FPM.
 - `backend` runs Laravel 12 on PHP 8.4 in Docker.

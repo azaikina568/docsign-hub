@@ -5,8 +5,12 @@ services:
     working_dir: /var/www/html
     env_file:
       - .env
+    environment:
+      # Диаграммы /docs/diagrams читаются из корневого docs/, проброшенного ниже.
+      DOCSIGN_DIAGRAMS_PATH: /srv/docs/diagrams.md
     volumes:
       - ./backend:/var/www/html
+      - ./docs:/srv/docs:ro
     command: sh -c "composer install && php-fpm"
     depends_on:
       postgres:
@@ -33,6 +37,8 @@ services:
       - ./backend:/var/www/html
     # Ждём, пока backend поставит зависимости в общий том, и запускаем планировщик.
     command: sh -c "until [ -f vendor/autoload.php ]; do sleep 2; done; php artisan schedule:work"
+    # Перезапуск, если процесс упадёт (минимальная супервизия; прод-grade — см. SCALING_PERFORMANCE).
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy

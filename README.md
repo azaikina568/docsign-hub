@@ -10,7 +10,7 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Frontend: Vue 3, TypeScript, Vite, Tailwind CSS, TanStack Query, Pinia, shadcn-vue-ready structure.
 - Infra: Docker Compose (включая отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint, PHPStan/Larastan, OpenAPI/Swagger (Scramble).
 
-Диаграммы (ERD, машина состояний, sequence отправки, развёртывание): [docs/diagrams.md](docs/diagrams.md).
+Диаграммы (ERD, машина состояний, sequence отправки, развёртывание): [docs/diagrams.md](docs/diagrams.md) — рендерятся на GitHub и как страница приложения на `/docs/diagrams`.
 
 ## Что реализовано
 
@@ -57,6 +57,7 @@ docker compose exec backend php artisan migrate:fresh --seed
 - Frontend: http://localhost:3000
 - API health: http://localhost:8080/api/v1/health
 - API docs (OpenAPI/Swagger, интерактивные): http://localhost:8080/docs/api
+- Диаграммы (отрисованные): http://localhost:8080/docs/diagrams
 - RabbitMQ: http://localhost:15672
 - Mailpit: http://localhost:8025
 - MongoDB: `localhost:27017`
@@ -73,7 +74,7 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | POST | `/api/v1/auth/login` | — | Логин, возвращает Bearer-токен |
 | POST | `/api/v1/auth/logout` | Bearer | Отзыв текущего токена |
 | GET | `/api/v1/me` | Bearer | Текущий пользователь |
-| GET | `/api/v1/documents` | Bearer | Список документов владельца (пагинация) |
+| GET | `/api/v1/documents` | Bearer | Список документов владельца (пагинация; фильтр `?status=`) |
 | POST | `/api/v1/documents` | Bearer | Создать документ (draft) |
 | GET | `/api/v1/documents/{document}` | Bearer | Документ с участниками |
 | PATCH | `/api/v1/documents/{document}` | Bearer | Изменить draft |

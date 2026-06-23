@@ -1,7 +1,9 @@
 # DocSign Hub — diagrams
 
-Mermaid-диаграммы (рендерятся прямо на GitHub). Держим их в синхроне с кодом: схема БД — с миграциями,
-state machine — с `DocumentStatus::allowedTransitions()`, sequence — с `SendDocumentAction` и листенерами.
+Mermaid-диаграммы. Рендерятся прямо на GitHub, а локально открываются как страница приложения на
+`/docs/diagrams` (этот же файл, отрисованный mermaid.js — по аналогии с `/docs/api`). Держим их в
+синхроне с кодом: схема БД — с миграциями, state machine — с `DocumentStatus::allowedTransitions()`,
+sequence — с `SendDocumentAction` и листенерами.
 
 ## Схема данных (ERD)
 
@@ -76,15 +78,15 @@ erDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> draft : create
-    draft --> pending : send (>=1 signer)
+    draft --> pending : send (минимум 1 signer)
     draft --> cancelled : cancel
     pending --> partially_signed : sign (stage 4)
     pending --> signed : sign last (stage 4)
     pending --> cancelled : cancel
-    pending --> expired : documents:expire
+    pending --> expired : срок истёк
     partially_signed --> signed : sign last (stage 4)
     partially_signed --> cancelled : cancel
-    partially_signed --> expired : documents:expire
+    partially_signed --> expired : срок истёк
     signed --> [*]
     cancelled --> [*]
     expired --> [*]
@@ -106,19 +108,19 @@ sequenceDiagram
 
     Owner->>API: POST /documents/{ulid}/send (Bearer)
     API->>Act: execute(document, owner)
-    Note over Act: проверки: draft, >=1 signer
+    Note over Act: проверки draft и минимум один signer
     rect rgb(238,246,255)
     Act->>DB: BEGIN
-    Act->>DB: для каждого signer — signature_token (hash + TTL)
-    Act->>DB: document.expires_at = deadline; status draft→pending + history
+    Act->>DB: на каждого signer создаём signature_token (hash, TTL)
+    Act->>DB: ставим expires_at, статус draft в pending, пишем history
     Act->>DB: COMMIT
     end
-    Act-->>Ev: dispatch (после commit)
+    Act-->>Ev: dispatch после commit
     Ev->>L: handle
-    L->>N: notify(document, invitation) на каждого signer
+    L->>N: notify документа и invitation на каждого signer
     N->>Mail: письмо с персональной ссылкой (plain-токен)
     Mail-->>Signer: приглашение подписать
-    API-->>Owner: 200 (без токенов в ответе)
+    API-->>Owner: 200 без токенов в ответе
 ```
 
 Plain-токен живёт только в памяти (`SigningInvitation`) и уходит подписанту письмом; отправителю не
