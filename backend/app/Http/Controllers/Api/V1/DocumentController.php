@@ -62,12 +62,15 @@ class DocumentController extends Controller
         return response()->json(['message' => 'Document deleted.']);
     }
 
-    public function events(Document $document): AnonymousResourceCollection
+    public function events(Request $request, Document $document): AnonymousResourceCollection
     {
         $this->authorize('view', $document);
 
+        // По умолчанию свежие события сверху; ?sort=asc — в хронологическом порядке.
+        $direction = $request->query('sort') === 'asc' ? 'asc' : 'desc';
+
         return DocumentStatusHistoryResource::collection(
-            $document->statusHistory()->latest('id')->get(),
+            $document->statusHistory()->orderBy('id', $direction)->paginate(15),
         );
     }
 }

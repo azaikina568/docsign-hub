@@ -21,7 +21,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Alice Carter',
             'email' => 'alice@example.com',
         ])
@@ -42,7 +42,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Late Party',
             'email' => 'late@example.com',
         ])->assertStatus(409);
@@ -56,7 +56,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->deleteJson("/api/v1/documents/{$document->id}/parties/{$party->id}")->assertOk();
+        $this->deleteJson("/api/v1/documents/{$document->ulid}/parties/{$party->id}")->assertOk();
         $this->assertDatabaseMissing('document_parties', ['id' => $party->id]);
     }
 
@@ -69,7 +69,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->deleteJson("/api/v1/documents/{$documentA->id}/parties/{$party->id}")->assertNotFound();
+        $this->deleteJson("/api/v1/documents/{$documentA->ulid}/parties/{$party->id}")->assertNotFound();
     }
 
     public function test_signing_order_applies_to_signers_not_viewers(): void
@@ -79,11 +79,11 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Signer', 'email' => 'signer@example.com', 'signing_order' => 2,
         ])->assertCreated()->assertJsonPath('data.signing_order', 2);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Viewer', 'email' => 'viewer@example.com', 'role' => 'viewer', 'signing_order' => 3,
         ])->assertCreated()->assertJsonPath('data.signing_order', null);
 
@@ -98,7 +98,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Duplicate',
             'email' => 'dup@example.com',
         ])->assertStatus(422)->assertJsonValidationErrors('email');
@@ -112,7 +112,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Member',
             'email' => 'member@example.com',
         ])->assertCreated();
@@ -121,7 +121,7 @@ class DocumentPartyTest extends TestCase
             'user_id' => $signerAccount->id,
         ]);
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Outsider',
             'email' => 'outsider@example.com',
         ])->assertCreated();
@@ -138,7 +138,7 @@ class DocumentPartyTest extends TestCase
 
         Sanctum::actingAs(User::factory()->create());
 
-        $this->postJson("/api/v1/documents/{$document->id}/parties", [
+        $this->postJson("/api/v1/documents/{$document->ulid}/parties", [
             'name' => 'Intruder',
             'email' => 'intruder@example.com',
         ])->assertForbidden();

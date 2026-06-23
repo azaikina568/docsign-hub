@@ -29,6 +29,16 @@ which validates the move against an explicit transition map (`DocumentStatus::al
 updates the document and appends a `document_status_history` row inside the same transaction —
 so a status can never be "skipped".
 
+**Public identifiers.** A document is addressed in the API and URLs by a `ulid` (unique, generated on
+create), not by its auto-increment primary key. The integer PK stays internal for foreign keys; the
+ULID is what `DocumentResource` exposes as `id` and what route-model binding resolves
+(`Document::getRouteKeyName()`). Nested parties keep their integer ids (scoped to the document).
+
+**Expiration.** `ExpireDocumentsAction` (driven by the `documents:expire` console command, scheduled
+daily in `routes/console.php`) moves any `pending`/`partially_signed` document past its `expires_at`
+to `expired` through the same transition map and history (actor = system, so `changed_by_user_id` is
+null). Each document is expired in its own transaction so one failure does not roll back the rest.
+
 **Roles & access.** Two distinct concepts. The **owner** manages the document (CRUD, parties, send,
 cancel) — enforced by `DocumentPolicy`. **Parties** are the people involved per document, with a
 `role`: a `signer` signs (and has a `signing_order` for sequential signing), a `viewer` only reads
@@ -61,8 +71,9 @@ notifications/audit could later move into separate services.
 ## Authentication
 
 The API uses Laravel Sanctum personal access tokens (Bearer). Public `auth/register` and
-`auth/login` endpoints are rate limited per IP; they return a plain-text token once, and only
-its hash is stored. Protected endpoints sit behind the `auth:sanctum` guard, and `auth/logout`
+`auth/login` endpoints are rate limited per IP (`throttle:auth`, 10/min); they return a plain-text
+token once, and only its hash is stored. Protected endpoints sit behind the `auth:sanctum` guard and
+a general `throttle:api` limiter (60/min, keyed by user id, falling back to IP), and `auth/logout`
 revokes the current token. All `api/*` responses, including errors, are rendered as JSON.
 
 ## API documentation

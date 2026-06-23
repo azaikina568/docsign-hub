@@ -17,7 +17,7 @@ class DocumentResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
+            'id' => $this->ulid,
             'title' => $this->title,
             'status' => $this->status->value,
             'content_hash' => $this->content_hash,

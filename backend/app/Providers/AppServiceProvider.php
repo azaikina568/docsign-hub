@@ -34,6 +34,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->ip());
         });
 
+        // Лимит по аутентифицированному пользователю, для гостей — по IP.
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
         Gate::policy(Document::class, DocumentPolicy::class);
 
         Event::listen(DocumentSent::class, SendSigningInvitations::class);

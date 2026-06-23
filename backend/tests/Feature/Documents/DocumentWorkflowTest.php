@@ -27,7 +27,7 @@ class DocumentWorkflowTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $response = $this->postJson("/api/v1/documents/{$document->id}/send");
+        $response = $this->postJson("/api/v1/documents/{$document->ulid}/send");
 
         $response->assertOk()->assertJsonPath('data.status', 'pending');
         // Токены не возвращаются отправителю.
@@ -63,7 +63,7 @@ class DocumentWorkflowTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/send")->assertStatus(409);
+        $this->postJson("/api/v1/documents/{$document->ulid}/send")->assertStatus(409);
     }
 
     public function test_owner_can_cancel_non_final_document(): void
@@ -73,7 +73,7 @@ class DocumentWorkflowTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/cancel", ['reason' => 'No longer needed'])
+        $this->postJson("/api/v1/documents/{$document->ulid}/cancel", ['reason' => 'No longer needed'])
             ->assertOk()
             ->assertJsonPath('data.status', 'cancelled');
 
@@ -91,7 +91,7 @@ class DocumentWorkflowTest extends TestCase
 
         Sanctum::actingAs($user);
 
-        $this->postJson("/api/v1/documents/{$document->id}/cancel")->assertStatus(409);
+        $this->postJson("/api/v1/documents/{$document->ulid}/cancel")->assertStatus(409);
     }
 
     public function test_events_endpoint_returns_status_history(): void
@@ -99,11 +99,34 @@ class DocumentWorkflowTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
-        $document = Document::query()->find(
-            $this->postJson('/api/v1/documents', ['title' => 'Tracked'])->json('data.id')
-        );
+        $ulid = $this->postJson('/api/v1/documents', ['title' => 'Tracked'])->json('data.id');
 
-        $this->getJson("/api/v1/documents/{$document->id}/events")
+        $this->getJson("/api/v1/documents/{$ulid}/events")
+            ->assertOk()
+            ->assertJsonPath('data.0.to_status', 'draft');
+    }
+
+    public function test_events_are_paginated_and_sortable(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        // Создаём через API, чтобы в истории появилась запись draft, затем send добавляет pending.
+        $ulid = $this->postJson('/api/v1/documents', ['title' => 'Tracked'])->json('data.id');
+        $document = Document::query()->where('ulid', $ulid)->firstOrFail();
+        DocumentParty::factory()->create(['document_id' => $document->id]);
+
+        $this->postJson("/api/v1/documents/{$ulid}/send")->assertOk();
+
+        // По умолчанию — свежие события первыми (draft -> pending).
+        $this->getJson("/api/v1/documents/{$ulid}/events")
+            ->assertOk()
+            ->assertJsonPath('data.0.to_status', 'pending')
+            ->assertJsonStructure(['data', 'links', 'meta']);
+
+        $this->getJson("/api/v1/documents/{$ulid}/events?sort=asc")
             ->assertOk()
             ->assertJsonPath('data.0.to_status', 'draft');
     }

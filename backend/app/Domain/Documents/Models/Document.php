@@ -11,9 +11,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
+ * @property string $ulid
  * @property int $owner_id
  * @property string $title
  * @property DocumentStatus $status
@@ -44,6 +46,19 @@ class Document extends Model
             'completed_at' => 'datetime',
             'expires_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Публичный идентификатор документа — ULID; int PK остаётся для FK.
+        static::creating(function (Document $document): void {
+            $document->ulid ??= (string) Str::ulid();
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'ulid';
     }
 
     /**

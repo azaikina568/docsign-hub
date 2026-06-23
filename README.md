@@ -15,8 +15,10 @@ DocSign Hub - демонстрационный сервис для сценар�
 - Laravel 12 в `backend/`.
 - Vue 3 + TypeScript + Vite в `frontend/`.
 - Аутентификация по токенам (Laravel Sanctum): регистрация, логин, логаут, профиль.
-- Rate limit на auth-endpoints, пароли хешируются, токены хранятся только хешем.
-- Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов.
+- Rate limit на auth-endpoints и на всём аутентифицированном API, пароли хешируются, токены хранятся только хешем.
+- Документы: CRUD, участники, отправка на подписание (`draft → pending`) и отмена, история статусов (пагинация + сортировка).
+- Документ адресуется в API по публичному ULID (а не по внутреннему числовому id).
+- Авто-экспирация: команда `documents:expire` (по расписанию, ежедневно) переводит просроченные документы в `expired`.
 - Доменный слой: PHP Enums + явная карта переходов статусов, Actions/Services, Policies (управляет только владелец).
 - Подписанты идентифицируются по email (аккаунт необязателен) и опционально связываются с пользователем системы.
 - При отправке приглашения уходят подписантам на email (локально — Mailpit); отправителю signing-токены не возвращаются, хранятся только хешем и со сроком жизни.
@@ -77,7 +79,9 @@ RabbitMQ default credentials for local development: `docsign` / `docsign`.
 | DELETE | `/api/v1/documents/{document}/parties/{party}` | Bearer | Удалить участника (draft) |
 | POST | `/api/v1/documents/{document}/send` | Bearer | Отправить на подписание |
 | POST | `/api/v1/documents/{document}/cancel` | Bearer | Отменить документ |
-| GET | `/api/v1/documents/{document}/events` | Bearer | История статусов |
+| GET | `/api/v1/documents/{document}/events` | Bearer | История статусов (пагинация; `?sort=asc` для хронологии) |
+
+`{document}` — публичный ULID документа (поле `id` в ответе), не внутренний числовой id.
 
 После `make fresh` доступен демо-пользователь: `owner@docsign.test` / `password`.
 Ссылки на подписание после `send` приходят подписантам в Mailpit (http://localhost:8025).
