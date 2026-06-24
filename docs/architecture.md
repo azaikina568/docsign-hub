@@ -165,14 +165,24 @@ Event types live in one registry — the `DomainEventType` enum (single source o
 version and routing key), so producers and consumers never drift on magic strings. Each event is a
 stable, versioned envelope (`event_id`, `event_type`, `routing_key` `*.vN`, `occurred_at`,
 `aggregate_id`, `actor_id`, `data`) — never a serialized Eloquent model, and with **no secrets or
-PII** (signing tokens and participant emails stay out of events). Shapes are documented in
-`contracts/events/v1` (machine-checkable JSON Schemas and an AsyncAPI catalog are planned — see
-`plans/MESSAGING_DESIGN.md`). `outbox_messages` has no foreign key to documents (it references the document
-ULID and carries a self-contained payload), so the messaging concern is not coupled to the domain
-schema and can move to a separate service later.
+PII** (signing tokens and participant emails stay out of events). Each event shape is pinned by a
+JSON Schema in `contracts/events/v1/*.schema.json`; a test validates every emitted payload against its
+schema, so the contract is enforced, not just illustrated (an AsyncAPI catalog is still planned — see
+`plans/MESSAGING_DESIGN.md`). `outbox_messages` has no foreign key to documents (it references the
+document ULID and carries a self-contained payload), so the messaging concern is not coupled to the
+domain schema and can move to a separate service later.
 
-A publisher that ships pending rows to the RabbitMQ exchange `docsign.events`, and the
-notifications/audit consumers (MongoDB), are the next steps. Planned routing keys:
+**Publisher.** A worker (`outbox:publish --daemon`, the `publisher` container) reads `pending` rows
+(`status, available_at` index) and publishes each to the topic exchange `docsign.events` via
+`EventPublisher` → `RabbitMqEventPublisher` (php-amqplib, publisher confirms). On the broker's ack the
+row is marked `published`; on failure `attempts` is incremented with exponential backoff
+(`available_at` pushed forward), and after `max_attempts` the row becomes `failed` — the producer-side
+dead-letter for manual inspection. The AMQP `message_id` carries the `event_id` so consumers can dedup
+(delivery is at-least-once). `messaging:setup` declares the topology idempotently (the topic exchange,
+a `docsign.dlx`/`docsign.dlq` dead-letter pair, and the durable `docsign.notifications`/`docsign.audit`
+queues bound to `document.*.v1`). The notifications/audit consumers (MongoDB) are the next step.
+
+Routing keys:
 
 ```text
 document.created.v1

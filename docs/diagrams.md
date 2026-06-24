@@ -259,37 +259,39 @@ sequenceDiagram
 ## Развёртывание (контейнеры)
 
 **Что показывает:** какие контейнеры есть и кто с кем общается. Сплошные стрелки — текущий рантайм,
-пунктир — dev-почта и заготовки под Этап 5.
+пунктир — dev-почта и заготовка под audit-consumer (Этап 5c).
 
 ```mermaid
 flowchart LR
     Client(["Клиент / Vue SPA"]) -->|HTTP| nginx
     nginx -->|FastCGI| backend["backend (php-fpm, Laravel 12)"]
     scheduler["scheduler (schedule:work)"]
+    publisher["publisher (outbox:publish)"]
     backend --> postgres[("PostgreSQL")]
     backend --> redis[("Redis: cache, rate-limit, locks")]
     scheduler --> postgres
-    scheduler --> redis
+    publisher --> postgres
+    publisher -->|события| rabbitmq["RabbitMQ"]
     backend -.->|dev| mailpit["Mailpit"]
-    backend -.->|stage 5| rabbitmq["RabbitMQ"]
-    backend -.->|stage 5| mongodb[("MongoDB: audit")]
+    rabbitmq -.->|stage 5c| mongodb[("MongoDB: audit")]
 ```
 
 ## События и очереди (Этап 5)
 
-**Что показывает:** путь доменного события. **Сделано (5a):** доменное действие в своей транзакции пишет строку
-в `outbox_messages` (сплошная стрелка action→outbox). **Следующие шаги:** publisher читает outbox и публикует в
-RabbitMQ topic → consumers (уведомления и audit в MongoDB), с dead-letter очередью для разбора сбоев (пунктир).
+**Что показывает:** путь доменного события. **Сделано (5a+5b):** действие в своей транзакции пишет строку в
+`outbox_messages`; publisher-воркер вычитывает готовые строки и публикует в topic-exchange `docsign.events`
+(publisher confirms), очереди их копят. **Следующее (5c):** consumers (уведомления + audit в MongoDB); отвергнутые
+(nack) уходят в dead-letter. Сплошное — реализовано, пунктир — план.
 
 ```mermaid
 flowchart LR
-    action["Domain Action (в транзакции)"] -->|сделано 5a| outbox[("outbox_messages")]
-    outbox -.->|план| publisher["publisher (worker)"]
-    publisher -.-> ex{{"exchange docsign.events (topic)"}}
-    ex -.->|document.*.v1| qn["queue: notifications"]
-    ex -.->|document.*.v1| qa["queue: audit"]
-    qn -.-> dlx{{"docsign.dlx"}}
-    qa -.-> dlx
+    action["Domain Action (в транзакции)"] -->|5a| outbox[("outbox_messages")]
+    outbox -->|5b| publisher["publisher (worker)"]
+    publisher --> ex{{"exchange docsign.events (topic)"}}
+    ex -->|document.*.v1| qn["queue: notifications"]
+    ex -->|document.*.v1| qa["queue: audit"]
+    qn -.->|nack 5c| dlx{{"docsign.dlx"}}
+    qa -.->|nack 5c| dlx
     dlx -.-> dlq[("docsign.dlq")]
-    qa -.-> mongo[("MongoDB")]
+    qa -.->|5c| mongo[("MongoDB")]
 ```

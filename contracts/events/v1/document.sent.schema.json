@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "document.sent.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event_type", "routing_key", "version", "occurred_at", "aggregate_type", "aggregate_id", "actor_id", "data"],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "event_type": { "const": "document.sent" },
+    "routing_key": { "const": "document.sent.v1" },
+    "version": { "const": 1 },
+    "occurred_at": { "type": "string", "minLength": 1 },
+    "aggregate_type": { "const": "document" },
+    "aggregate_id": { "type": "string", "minLength": 1 },
+    "actor_id": { "type": ["integer", "null"] },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "signers", "expires_at"],
+      "properties": {
+        "title": { "type": "string" },
+        "signers": { "type": "integer", "minimum": 1 },
+        "expires_at": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

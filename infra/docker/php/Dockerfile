@@ -8,12 +8,14 @@ RUN apk add --no-cache \
         icu-dev \
         libzip-dev \
         postgresql-dev \
+    # Сборочные зависимости — до компиляции расширений; linux-headers нужен ext-sockets (sock_diag.h).
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers \
     && docker-php-ext-install \
         intl \
         pcntl \
         pdo_pgsql \
+        sockets \
         zip \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps

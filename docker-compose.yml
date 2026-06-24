@@ -6,11 +6,14 @@ services:
     env_file:
       - .env
     environment:
-      # Диаграммы /docs/diagrams читаются из корневого docs/, проброшенного ниже.
+      # Диаграммы /docs/diagrams и JSON Schema контрактов читаются из корневых docs/ и contracts/,
+      # проброшенных ниже (они вне ./backend, поэтому отдельными томами).
       DOCSIGN_DIAGRAMS_PATH: /srv/docs/diagrams.md
+      DOCSIGN_CONTRACTS_PATH: /srv/contracts/events/v1
     volumes:
       - ./backend:/var/www/html
       - ./docs:/srv/docs:ro
+      - ./contracts:/srv/contracts:ro
     command: sh -c "composer install && php-fpm"
     depends_on:
       postgres:
@@ -44,6 +47,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  # Воркер-публишер: вычитывает outbox и шлёт события в RabbitMQ (transactional outbox).
+  publisher:
+    build:
+      context: ./infra/docker/php
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/var/www/html
+    # Ждём установку зависимостей, объявляем топологию, затем крутим демон.
+    command: sh -c "until [ -f vendor/autoload.php ]; do sleep 2; done; php artisan messaging:setup && php artisan outbox:publish --daemon"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   nginx:
     image: nginx:1.27-alpine

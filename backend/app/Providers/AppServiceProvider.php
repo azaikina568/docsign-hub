@@ -7,6 +7,9 @@ use App\Domain\Documents\Events\DocumentSent;
 use App\Domain\Documents\Listeners\SendSigningInvitations;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Policies\DocumentPolicy;
+use App\Domain\Messaging\Contracts\EventPublisher;
+use App\Infrastructure\Messaging\RabbitMqConnection;
+use App\Infrastructure\Messaging\RabbitMqEventPublisher;
 use App\Infrastructure\Notifications\MailSigningInvitationNotifier;
 use App\Models\PersonalAccessToken;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -25,6 +28,13 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(SigningInvitationNotifier::class, MailSigningInvitationNotifier::class);
+
+        // Одно соединение с брокером на процесс; издатель за доменным контрактом (в тестах — фейк).
+        $this->app->singleton(RabbitMqConnection::class, fn () => new RabbitMqConnection(config('messaging.rabbitmq')));
+        $this->app->bind(EventPublisher::class, fn ($app) => new RabbitMqEventPublisher(
+            $app->make(RabbitMqConnection::class),
+            (string) config('messaging.rabbitmq.exchange'),
+        ));
     }
 
     /**

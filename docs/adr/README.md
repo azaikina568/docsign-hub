@@ -6,3 +6,4 @@ One file per decision, numbered, never rewritten — superseding decisions get a
 | # | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-transactional-outbox.md) | Domain events via a transactional outbox | Accepted |
+| [0002](0002-outbox-publisher.md) | Outbox publisher: at-least-once via a single worker | Accepted |

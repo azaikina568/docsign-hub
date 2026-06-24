@@ -48,6 +48,11 @@ DocSign Hub — демонстрационный сервис электронн
   содержимого (`content_hash`). Приглашения уходят подписантам на email (в dev — Mailpit); отправителю
   токены не возвращаются.
 
+**События (messaging)**
+- Доменные события (`document.created/sent/signed/completed/cancelled/expired`) пишутся в transactional
+  outbox в одной транзакции с бизнес-данными и публикуются worker'ом в RabbitMQ (`docsign.events`) с
+  ретраями/backoff. Форма каждого события зафиксирована JSON Schema (`contracts/events/v1`).
+
 **Прочее**
 - `GET /api/v1/health`, интерактивная API-документация на `/docs/api` (генерируется из кода), отрисованные
   диаграммы на `/docs/diagrams`.
@@ -143,10 +148,11 @@ refresh_token, refresh_expires_at } }`. Для API шлём `Authorization: Bear
 
 PostgreSQL — источник истины (пользователи, документы, участники, подписи, токены, история). Redis — точечно
 (rate-limit, cache, short-lived locks). Доменные события идут через **transactional outbox**: действие в своей
-транзакции пишет бизнес-данные и строку в `outbox_messages` (уже реализовано — атомарно, без потерь);
-publisher шлёт событие в exchange `docsign.events`, а consumers (уведомления, audit в MongoDB) — следующий шаг.
-Это задел под микросервисы: кросс-контекстные эффекты идут через версионированные контракты событий
-(`contracts/events/v1`), поэтому notifications/audit позже можно вынести в отдельные сервисы, не трогая ядро.
+транзакции пишет бизнес-данные и строку в `outbox_messages` (атомарно, без потерь), а отдельный worker-publisher
+(`outbox:publish`) шлёт их в topic-exchange `docsign.events` с ретраями/backoff. Форма каждого события
+зафиксирована JSON Schema (`contracts/events/v1`). Consumers (уведомления, audit в MongoDB) — следующий шаг.
+Это задел под микросервисы: кросс-контекстные эффекты идут через версионированные контракты событий,
+поэтому notifications/audit позже можно вынести в отдельные сервисы, не трогая ядро.
 
 Подробнее — [docs/architecture.md](docs/architecture.md); диаграммы (ERD, машина состояний, sequence
 отправки/подписания, deployment, messaging) — [docs/diagrams.md](docs/diagrams.md) (рендерятся на GitHub и на
