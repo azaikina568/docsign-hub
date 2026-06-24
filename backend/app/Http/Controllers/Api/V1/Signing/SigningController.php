@@ -7,12 +7,11 @@ use App\Domain\Documents\Actions\SignDocumentAction;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SignatureResource;
 use App\Http\Resources\SigningContextResource;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/**
- * @group Signing
- */
+#[Group('Signing', 'Подписание участником — по одноразовой ссылке (capability) или под своим аккаунтом (identity).', weight: 4)]
 class SigningController extends Controller
 {
     /**

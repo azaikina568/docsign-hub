@@ -144,10 +144,11 @@ Planned routing keys:
 
 ```text
 document.created.v1
-document.party_added.v1
 document.sent.v1
 document.signed.v1
 document.completed.v1
+document.cancelled.v1
+document.expired.v1
 ```
 
 ## Towards services (future-proofing)

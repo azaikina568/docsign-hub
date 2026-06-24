@@ -10,13 +10,12 @@ use App\Domain\Documents\Models\DocumentParty;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SignatureResource;
 use App\Http\Resources\SigningRequestResource;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
-/**
- * @group Signing
- */
+#[Group('Signing', weight: 4)]
 class SigningRequestController extends Controller
 {
     /**

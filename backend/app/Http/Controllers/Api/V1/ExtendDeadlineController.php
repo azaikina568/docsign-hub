@@ -7,11 +7,10 @@ use App\Domain\Documents\Models\Document;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\ExtendDeadlineRequest;
 use App\Http\Resources\DocumentResource;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Support\Carbon;
 
-/**
- * @group Documents
- */
+#[Group('Documents', weight: 3)]
 class ExtendDeadlineController extends Controller
 {
     /**

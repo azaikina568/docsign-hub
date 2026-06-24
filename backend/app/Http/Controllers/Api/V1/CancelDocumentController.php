@@ -7,10 +7,9 @@ use App\Domain\Documents\Models\Document;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\CancelDocumentRequest;
 use App\Http\Resources\DocumentResource;
+use Dedoc\Scramble\Attributes\Group;
 
-/**
- * @group Documents
- */
+#[Group('Documents', weight: 3)]
 class CancelDocumentController extends Controller
 {
     /**

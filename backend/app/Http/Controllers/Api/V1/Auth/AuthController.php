@@ -13,14 +13,13 @@ use App\Http\Resources\TokenPairResource;
 use App\Http\Resources\UserResource;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
-/**
- * @group Authentication
- */
+#[Group('Authentication', 'Регистрация, вход и управление токенами (access + refresh).', weight: 2)]
 class AuthController extends Controller
 {
     /**

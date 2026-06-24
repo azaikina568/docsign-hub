@@ -5,19 +5,14 @@ use App\Http\Controllers\Api\V1\CancelDocumentController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DocumentPartyController;
 use App\Http\Controllers\Api\V1\ExtendDeadlineController;
+use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\SendDocumentController;
 use App\Http\Controllers\Api\V1\Signing\SigningController;
 use App\Http\Controllers\Api\V1\Signing\SigningRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    Route::get('health', function () {
-        return response()->json([
-            'status' => 'ok',
-            'service' => 'docsign-hub',
-            'timestamp' => now()->toISOString(),
-        ]);
-    });
+    Route::get('health', HealthController::class);
 
     Route::prefix('auth')->middleware('throttle:auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);

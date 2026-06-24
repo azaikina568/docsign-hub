@@ -9,13 +9,15 @@ use App\Domain\Documents\Models\DocumentParty;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\StoreDocumentPartyRequest;
 use App\Http\Resources\DocumentPartyResource;
+use Dedoc\Scramble\Attributes\Group;
 use Illuminate\Http\JsonResponse;
 
-/**
- * @group Documents
- */
+#[Group('Documents', weight: 3)]
 class DocumentPartyController extends Controller
 {
+    /**
+     * Add a party (signer or viewer) to a draft document.
+     */
     public function store(StoreDocumentPartyRequest $request, Document $document, AddDocumentPartyAction $action): JsonResponse
     {
         $this->authorize('manage', $document);
@@ -25,6 +27,9 @@ class DocumentPartyController extends Controller
         return DocumentPartyResource::make($party)->response()->setStatusCode(201);
     }
 
+    /**
+     * Remove a party from a draft document.
+     */
     public function destroy(Document $document, DocumentParty $party, RemoveDocumentPartyAction $action): JsonResponse
     {
         $this->authorize('manage', $document);
