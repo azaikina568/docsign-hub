@@ -1,0 +1,15 @@
+{
+  "event_id": "018f62f5-2b3c-7d4e-9f5a-6b7c8d9e0f1a",
+  "event_type": "document.signed",
+  "routing_key": "document.signed.v1",
+  "version": 1,
+  "occurred_at": "2026-06-24T10:00:00.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": null,
+  "data": {
+    "party_id": 17,
+    "signing_order": 1,
+    "signature_id": 9
+  }
+}

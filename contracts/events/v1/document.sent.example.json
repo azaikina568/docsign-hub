@@ -1,0 +1,15 @@
+{
+  "event_id": "018f62f4-1a2b-7c3d-8e4f-5a6b7c8d9e0f",
+  "event_type": "document.sent",
+  "routing_key": "document.sent.v1",
+  "version": 1,
+  "occurred_at": "2026-06-24T09:05:00.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": 42,
+  "data": {
+    "title": "Consulting agreement",
+    "signers": 2,
+    "expires_at": "2026-07-01T09:05:00.000000Z"
+  }
+}

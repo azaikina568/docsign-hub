@@ -1,0 +1,13 @@
+{
+  "event_id": "018f62f7-4d5e-7f6a-9b7c-8d9e0f1a2b3c",
+  "event_type": "document.cancelled",
+  "routing_key": "document.cancelled.v1",
+  "version": 1,
+  "occurred_at": "2026-06-24T11:00:00.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": 42,
+  "data": {
+    "reason": "Client postponed the deal"
+  }
+}

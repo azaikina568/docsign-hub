@@ -149,11 +149,25 @@ draft -> pending -> partially_signed -> signed
                  -> expired
 ```
 
-## Events
+## Domain events & outbox
 
-The planned RabbitMQ exchange is `docsign.events`. Event contracts live under `contracts/events/v1` and should contain stable, versioned payload shapes instead of serialized Eloquent models.
+Domain actions emit events through a **transactional outbox** (ADR
+[0001](adr/0001-transactional-outbox.md)). Inside the same `DB::transaction` as its business writes,
+each action calls `OutboxWriter::record(OutboxEvent)` (`app/Domain/Messaging`), inserting a row into
+`outbox_messages` — so business state and the emitted event commit or roll back together (no lost or
+phantom events). Events recorded today: `document.created` (create), `document.sent` (send),
+`document.signed` (per signature), `document.completed` (envelope fully signed), `document.cancelled`
+(cancel), `document.expired` (expiration command).
 
-Planned routing keys:
+Each event is a stable, versioned envelope (`event_id`, `event_type`, `routing_key` `*.vN`,
+`occurred_at`, `aggregate_id`, `actor_id`, `data`) — never a serialized Eloquent model, and with **no
+secrets or PII** (signing tokens and participant emails stay out of events). Shapes are documented in
+`contracts/events/v1`. `outbox_messages` has no foreign key to documents (it references the document
+ULID and carries a self-contained payload), so the messaging concern is not coupled to the domain
+schema and can move to a separate service later.
+
+A publisher that ships pending rows to the RabbitMQ exchange `docsign.events`, and the
+notifications/audit consumers (MongoDB), are the next steps. Planned routing keys:
 
 ```text
 document.created.v1

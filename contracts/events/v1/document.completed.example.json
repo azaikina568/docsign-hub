@@ -1,0 +1,13 @@
+{
+  "event_id": "018f62f6-3c4d-7e5f-8a6b-7c8d9e0f1a2b",
+  "event_type": "document.completed",
+  "routing_key": "document.completed.v1",
+  "version": 1,
+  "occurred_at": "2026-06-24T10:30:00.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": null,
+  "data": {
+    "completed_at": "2026-06-24T10:30:00.000000Z"
+  }
+}

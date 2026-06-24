@@ -1,0 +1,13 @@
+{
+  "event_id": "018f62f8-5e6f-7a7b-8c9d-0e1f2a3b4c5d",
+  "event_type": "document.expired",
+  "routing_key": "document.expired.v1",
+  "version": 1,
+  "occurred_at": "2026-06-24T12:00:00.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": null,
+  "data": {
+    "expired_at": "2026-06-24T12:00:00.000000Z"
+  }
+}

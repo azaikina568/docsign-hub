@@ -142,10 +142,11 @@ refresh_token, refresh_expires_at } }`. Для API шлём `Authorization: Bear
 по явной карте переходов и пишет строку в `document_status_history` в одной транзакции.
 
 PostgreSQL — источник истины (пользователи, документы, участники, подписи, токены, история). Redis — точечно
-(rate-limit, cache, short-lived locks). RabbitMQ подключается через outbox (доменное действие в транзакции
-пишет бизнес-данные и outbox-строку, отдельный publisher шлёт событие в exchange `docsign.events`); MongoDB —
-для audit events. Это задел: кросс-контекстные эффекты идут через доменные события и контракты, поэтому
-notifications/audit позже можно вынести в отдельные сервисы, не трогая ядро.
+(rate-limit, cache, short-lived locks). Доменные события идут через **transactional outbox**: действие в своей
+транзакции пишет бизнес-данные и строку в `outbox_messages` (уже реализовано — атомарно, без потерь);
+publisher шлёт событие в exchange `docsign.events`, а consumers (уведомления, audit в MongoDB) — следующий шаг.
+Это задел под микросервисы: кросс-контекстные эффекты идут через версионированные контракты событий
+(`contracts/events/v1`), поэтому notifications/audit позже можно вынести в отдельные сервисы, не трогая ядро.
 
 Подробнее — [docs/architecture.md](docs/architecture.md); диаграммы (ERD, машина состояний, sequence
 отправки/подписания, deployment, messaging) — [docs/diagrams.md](docs/diagrams.md) (рендерятся на GitHub и на

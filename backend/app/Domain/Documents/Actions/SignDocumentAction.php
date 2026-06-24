@@ -13,13 +13,18 @@ use App\Domain\Documents\Models\DocumentParty;
 use App\Domain\Documents\Models\Signature;
 use App\Domain\Documents\Models\SignatureToken;
 use App\Domain\Documents\Services\DocumentStatusService;
+use App\Domain\Messaging\Data\OutboxEvent;
+use App\Domain\Messaging\Services\OutboxWriter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SignDocumentAction
 {
-    public function __construct(private readonly DocumentStatusService $statusService) {}
+    public function __construct(
+        private readonly DocumentStatusService $statusService,
+        private readonly OutboxWriter $outbox,
+    ) {}
 
     /**
      * Подписывает участие party. Идемпотентно: повторная подпись возвращает уже созданную.
@@ -80,6 +85,20 @@ class SignDocumentAction
             $usedToken?->forceFill(['used_at' => $signature->signed_at])->save();
 
             $this->advanceDocumentStatus($document, $authUser);
+
+            // Событие на каждую подпись (на нём строится доставка следующему по очереди — OPEN_QUESTIONS Q3).
+            $this->outbox->record(OutboxEvent::make('document.signed', $document->ulid, $authUser?->id, [
+                'party_id' => $party->id,
+                'signing_order' => $party->signing_order,
+                'signature_id' => $signature->id,
+            ]));
+
+            // Отдельное событие завершения конверта — для уведомления владельца.
+            if ($document->status === DocumentStatus::Signed) {
+                $this->outbox->record(OutboxEvent::make('document.completed', $document->ulid, $authUser?->id, [
+                    'completed_at' => $document->completed_at?->toISOString(),
+                ]));
+            }
 
             return $signature;
         });

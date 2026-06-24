@@ -77,11 +77,24 @@ erDiagram
         bigint changed_by_user_id FK "nullable: null = система (expire)"
         timestamp created_at
     }
+    outbox_messages {
+        bigint id PK
+        uuid event_id UK "дедуп публикации"
+        string event_type "document.signed"
+        string routing_key "document.signed.v1"
+        string aggregate_id "document ULID, без FK"
+        json payload "конверт события"
+        string status "pending|published|failed"
+        timestamp available_at "когда публиковать"
+        timestamp published_at "nullable"
+    }
 ```
 
 Уникальные ключи: `documents.ulid`, `document_parties(document_id, email)`, `signature_tokens.token_hash`,
-`signatures.document_party_id`. Составной индекс `documents(owner_id, status, created_at)` под список владельца.
-Таблицы `signatures`/поле `content_hash`/`signature_tokens.used_at` — задел под подписание (Этап 4).
+`signatures.document_party_id`, `outbox_messages.event_id`. Составной индекс `documents(owner_id, status, created_at)`
+под список владельца; `outbox_messages(status, available_at)` под выборку publisher'ом.
+`outbox_messages` стоит особняком (без FK): ссылается на документ по ULID и хранит самодостаточный payload —
+так контекст обмена сообщениями не связан схемой с доменом и его можно вынести в отдельный сервис.
 
 ## Жизненный цикл документа (state machine)
 
@@ -262,20 +275,21 @@ flowchart LR
     backend -.->|stage 5| mongodb[("MongoDB: audit")]
 ```
 
-## События и очереди (план, Этап 5)
+## События и очереди (Этап 5)
 
-**Что показывает:** будущий путь доменного события (ещё не реализовано). Транзакционный outbox → publisher
-→ RabbitMQ topic → consumers (уведомления и audit), с dead-letter очередью для разбора сбоев.
+**Что показывает:** путь доменного события. **Сделано (5a):** доменное действие в своей транзакции пишет строку
+в `outbox_messages` (сплошная стрелка action→outbox). **Следующие шаги:** publisher читает outbox и публикует в
+RabbitMQ topic → consumers (уведомления и audit в MongoDB), с dead-letter очередью для разбора сбоев (пунктир).
 
 ```mermaid
 flowchart LR
-    action["Domain Action (в транзакции)"] --> outbox[("outbox_messages")]
-    outbox --> publisher["publisher (worker)"]
-    publisher --> ex{{"exchange docsign.events (topic)"}}
-    ex -->|document.*.v1| qn["queue: notifications"]
-    ex -->|document.*.v1| qa["queue: audit"]
-    qn --> dlx{{"docsign.dlx"}}
-    qa --> dlx
-    dlx --> dlq[("docsign.dlq")]
-    qa --> mongo[("MongoDB")]
+    action["Domain Action (в транзакции)"] -->|сделано 5a| outbox[("outbox_messages")]
+    outbox -.->|план| publisher["publisher (worker)"]
+    publisher -.-> ex{{"exchange docsign.events (topic)"}}
+    ex -.->|document.*.v1| qn["queue: notifications"]
+    ex -.->|document.*.v1| qa["queue: audit"]
+    qn -.-> dlx{{"docsign.dlx"}}
+    qa -.-> dlx
+    dlx -.-> dlq[("docsign.dlq")]
+    qa -.-> mongo[("MongoDB")]
 ```

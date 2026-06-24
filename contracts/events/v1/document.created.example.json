@@ -3,11 +3,12 @@
   "event_type": "document.created",
   "routing_key": "document.created.v1",
   "version": 1,
-  "occurred_at": "2026-06-22T09:00:00Z",
-  "aggregate_id": "document-demo-id",
-  "actor_id": "user-demo-id",
+  "occurred_at": "2026-06-24T09:00:00.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": 42,
   "data": {
-    "title": "Demo contract",
+    "title": "Consulting agreement",
     "status": "draft"
   }
 }
