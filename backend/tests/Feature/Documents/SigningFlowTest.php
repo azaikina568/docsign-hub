@@ -9,8 +9,8 @@ use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Models\DocumentParty;
 use App\Domain\Documents\Models\SignatureToken;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -25,7 +25,7 @@ class SigningFlowTest extends TestCase
      * @param  array<string, mixed>  $partyAttrs
      * @return array{0: Document, 1: DocumentParty, 2: string}
      */
-    private function pendingDocumentWithSigner(User $owner, array $partyAttrs = [], ?Carbon $expiresAt = null): array
+    private function pendingDocumentWithSigner(User $owner, array $partyAttrs = [], ?CarbonInterface $expiresAt = null): array
     {
         $document = Document::factory()->status(DocumentStatus::Pending)->create([
             'owner_id' => $owner->id,

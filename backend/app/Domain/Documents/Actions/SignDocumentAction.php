@@ -75,12 +75,9 @@ class SignDocumentAction
             $party->forceFill(['status' => PartyStatus::Signed, 'signed_at' => $signature->signed_at])->save();
 
             // Гасим capability-токен: emailed-ссылка одноразовая. Если подписали по identity
-            // (token не передан) — всё равно закрываем висящий неиспользованный токен этого участника.
-            if ($token !== null) {
-                $token->forceFill(['used_at' => $signature->signed_at])->save();
-            } else {
-                $party->signatureToken()->whereNull('used_at')->update(['used_at' => $signature->signed_at]);
-            }
+            // (token не передан) — закрываем висящий неиспользованный токен этого участника.
+            $usedToken = $token ?? $party->signatureToken()->whereNull('used_at')->first();
+            $usedToken?->forceFill(['used_at' => $signature->signed_at])->save();
 
             $this->advanceDocumentStatus($document, $authUser);
 
