@@ -8,7 +8,8 @@ sequence — с `SendDocumentAction` и листенерами.
 Каждый раздел: сначала «что показывает», затем сама диаграмма, при необходимости — «как читать».
 Содержание: [ERD](#схема-данных-erd) · [статусы документа](#жизненный-цикл-документа-state-machine) ·
 [отправка на подписание](#отправка-на-подписание-sequence) · [обновление токенов](#обновление-токенов-sequence) ·
-[развёртывание](#развёртывание-контейнеры) · [события и очереди](#события-и-очереди-план-этап-5).
+[верификация email](#верификация-email-sequence) · [развёртывание](#развёртывание-контейнеры) ·
+[события и очереди](#события-и-очереди-план-этап-5).
 
 ## Схема данных (ERD)
 
@@ -209,6 +210,38 @@ sequenceDiagram
 
 Access-токен ходит в API (ability `access-api`), refresh — только на `/auth/refresh` (ability
 `issue-access`); они невзаимозаменяемы. `logout` и детекция переиспользования гасят всю семью.
+
+## Верификация email (sequence)
+
+**Что показывает:** как подтверждается email — от регистрации до перехода по подписанной ссылке из письма.
+Ссылка верификации публична: её подпись и есть capability (доказательство контроля над ящиком), поэтому
+Bearer не нужен. Источник истины — `RegisterUserAction` и `EmailVerificationController`.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant API as AuthController /register
+    participant Act as RegisterUserAction
+    participant Mail as Mailpit / провайдер
+    participant V as EmailVerificationController
+
+    User->>API: POST /auth/register
+    API->>Act: execute(data)
+    Act->>Mail: событие Registered шлёт письмо со подписанной ссылкой
+    API-->>User: 201 user (email_verified_at null) и токены
+    Mail-->>User: ссылка GET /auth/verify/{id}/{hash}
+    User->>V: переход по подписанной ссылке
+    Note over V: middleware signed проверил подпись и срок
+    alt уже подтверждён
+        V-->>User: 200 already verified
+    else подпись валидна и hash совпал
+        V->>V: markEmailAsVerified, событие Verified
+        V-->>User: 200 email verified
+    end
+```
+
+Создавать документы можно только с подтверждённым email (`DocumentPolicy::create`). Повторная отправка
+ссылки — `POST /auth/verification/resend` под логином, с тугим `throttle:verification`.
 
 ## Развёртывание (контейнеры)
 

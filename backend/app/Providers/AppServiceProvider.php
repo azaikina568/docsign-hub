@@ -41,6 +41,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Подтверждение email: тугой лимит против перебора ссылок и спама resend (по пользователю/IP).
+        RateLimiter::for('verification', function (Request $request) {
+            return Limit::perMinute(6)->by($request->user()?->id ?: $request->ip());
+        });
+
         // Публичные signing-роуты: защита от перебора токенов — лимит и по IP, и по самому токену.
         RateLimiter::for('signing', function (Request $request) {
             $token = (string) $request->route('token');

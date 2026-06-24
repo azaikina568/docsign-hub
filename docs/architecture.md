@@ -122,6 +122,19 @@ already-consumed refresh means it was likely stolen — the whole family is revo
 gets 401. `logout` also deletes the whole family (access + refresh). Expired/rotated tokens are
 pruned daily by the scheduled `sanctum:prune-expired`.
 
+**Email verification.** `User` implements `MustVerifyEmail`. Registration dispatches `Registered`, so
+the framework mails a signed verification link (Mailpit in dev). The verify route
+(`GET /auth/verify/{id}/{hash}`, name `verification.verify`) is **public**: the URL signature is itself
+the capability (proof of mailbox control), so no Bearer token is needed — the `signed` middleware
+validates the signature and expiry, and the controller re-checks the hash against the user's current
+email. It is idempotent (re-visiting an already-verified link returns 200). `POST /auth/verification/resend`
+(authenticated) re-sends the link; both verification routes share a tight `throttle:verification` limiter.
+The **gate** lives at the document-creation boundary: `DocumentPolicy::create` requires a verified email.
+Because verification is monotonic (no email-change or un-verify path exists), gating creation transitively
+covers every later owner action (send/cancel/parties/deadline) — they only exist on documents created by
+an already-verified owner. `DocumentPolicy::create` is also the extension point for a future
+who-may-create policy (invite-only / quota / subscription — see `plans/OPEN_QUESTIONS.md` Q2).
+
 ## API documentation
 
 The OpenAPI document is generated from the code (routes, Form Requests, Resources) by Scramble and

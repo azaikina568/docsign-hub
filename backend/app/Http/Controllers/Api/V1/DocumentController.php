@@ -40,6 +40,8 @@ class DocumentController extends Controller
      */
     public function store(StoreDocumentRequest $request, CreateDocumentAction $action): JsonResponse
     {
+        $this->authorize('create', Document::class);
+
         $document = $action->execute($request->user(), $request->validated());
 
         return DocumentResource::make($document)->response()->setStatusCode(201);

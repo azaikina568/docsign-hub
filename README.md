@@ -8,9 +8,9 @@ DocSign Hub — демонстрационный сервис электронн
 
 ## Статус
 
-Бэкенд закрывает основной поток подписания: аутентификация, документы и строго последовательное подписание
-по модели «capability или identity». Frontend пока — каркас с проверкой API. События в RabbitMQ, audit в
-MongoDB, полноценный UI и email-верификация — следующие шаги (см. [Roadmap](#roadmap)).
+Бэкенд закрывает основной поток подписания: аутентификация (с верификацией email), документы и строго
+последовательное подписание по модели «capability или identity». Frontend пока — каркас с проверкой API.
+События в RabbitMQ, audit в MongoDB и полноценный UI — следующие шаги (см. [Roadmap](#roadmap)).
 
 ## Стек
 
@@ -27,6 +27,9 @@ MongoDB, полноценный UI и email-верификация — след�
 - Пара **access + refresh**: короткий access для API, долгий refresh для обновления; они невзаимозаменяемы
   (token abilities). `/auth/refresh` ротирует refresh с детекцией переиспользования (отзыв всей сессии),
   `logout` рвёт обе стороны. Пароли и токены хранятся только хешем; rate-limit на auth и на всём API.
+- **Верификация email**: при регистрации уходит письмо со подписанной ссылкой (подпись = доказательство
+  контроля над ящиком), есть повторная отправка с тугим rate-limit. Создание документов — только с
+  подтверждённым email (точка расширения под invite-only/подписку).
 
 **Документы**
 - CRUD черновиков, участники (signer/viewer), отправка на подписание (`draft → pending`), отмена, продление
@@ -54,7 +57,6 @@ MongoDB, полноценный UI и email-верификация — след�
 
 | Дальше | Что |
 | --- | --- |
-| Email verification | `MustVerifyEmail`, signed-URL верификация, гейт `verified` на чувствительные действия |
 | RabbitMQ + outbox + audit | доменные события через transactional outbox → RabbitMQ; audit в MongoDB; уведомления |
 | Frontend | дашборд документов, public sign page, viewer read-only, состояния loading/empty/error |
 | CI, docs, cleanup | GitHub Actions (+ GitLab CI), финальная документация |
@@ -93,7 +95,7 @@ docker compose exec backend php artisan migrate:fresh --seed
 | API health | http://localhost:8080/api/v1/health |
 | API docs (OpenAPI/Swagger) | http://localhost:8080/docs/api |
 | Диаграммы (отрисованные) | http://localhost:8080/docs/diagrams |
-| RabbitMQ (`docsign` / `docsign`) | http://localhost:15672 |
+| RabbitMQ (`docsign`) | http://localhost:15672 |
 | Mailpit | http://localhost:8025 |
 | PostgreSQL | `localhost:5432` |
 | MongoDB | `localhost:27017` |
@@ -107,6 +109,8 @@ docker compose exec backend php artisan migrate:fresh --seed
 | POST | `/api/v1/auth/login` | — | Логин, возвращает пару access + refresh |
 | POST | `/api/v1/auth/refresh` | Bearer (refresh) | Обменять refresh на новую пару (ротация + reuse-detection) |
 | POST | `/api/v1/auth/logout` | Bearer (access) | Отзыв всей сессии (access + refresh) |
+| GET | `/api/v1/auth/verify/{id}/{hash}` | подписанная ссылка | Подтвердить email по ссылке из письма |
+| POST | `/api/v1/auth/verification/resend` | Bearer (access) | Повторно отправить ссылку подтверждения |
 | GET | `/api/v1/me` | Bearer (access) | Текущий пользователь |
 | GET | `/api/v1/documents` | Bearer | Список документов владельца (пагинация; фильтр `?status=`) |
 | POST | `/api/v1/documents` | Bearer | Создать документ (draft) |

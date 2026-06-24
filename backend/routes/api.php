@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\CancelDocumentController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DocumentPartyController;
@@ -21,6 +22,12 @@ Route::prefix('v1')->group(function () {
         Route::post('refresh', [AuthController::class, 'refresh'])->middleware(['auth:sanctum', 'abilities:issue-access']);
     });
 
+    // Подтверждение email по подписанной ссылке из письма: подпись и есть capability (доказательство
+    // контроля над ящиком), поэтому роут публичный — auth не требуется, проверяет `signed`.
+    Route::get('auth/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware(['throttle:verification', 'signed'])
+        ->name('verification.verify');
+
     // Публичное подписание по capability-токену (внешний участник). Свой throttle —
     // по токену и IP, без аутентификации. Для account-bound подпись требует логина.
     Route::prefix('signing')->middleware('throttle:signing')->group(function () {
@@ -30,6 +37,7 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', 'abilities:access-api', 'throttle:api'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::post('auth/verification/resend', [EmailVerificationController::class, 'resend'])->middleware('throttle:verification');
         Route::get('me', [AuthController::class, 'me']);
 
         // Подписание зарегистрированным участником из дашборда (identity-путь).

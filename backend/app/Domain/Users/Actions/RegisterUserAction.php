@@ -3,6 +3,7 @@
 namespace App\Domain\Users\Actions;
 
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 
 class RegisterUserAction
 {
@@ -13,10 +14,15 @@ class RegisterUserAction
      */
     public function execute(array $data): User
     {
-        return User::create([
+        $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => $data['password'],
         ]);
+
+        // Registered → SendEmailVerificationNotification (фреймворк): письмо с подтверждением email.
+        event(new Registered($user));
+
+        return $user;
     }
 }
