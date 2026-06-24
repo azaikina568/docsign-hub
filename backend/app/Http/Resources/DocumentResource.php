@@ -20,7 +20,6 @@ class DocumentResource extends JsonResource
             'id' => $this->ulid,
             'title' => $this->title,
             'status' => $this->status->value,
-            'content_hash' => $this->content_hash,
             'expires_at' => $this->expires_at?->toISOString(),
             'completed_at' => $this->completed_at?->toISOString(),
             'parties_count' => $this->whenCounted('parties'),

@@ -14,6 +14,7 @@ use App\Domain\Documents\Models\Signature;
 use App\Domain\Documents\Models\SignatureToken;
 use App\Domain\Documents\Services\DocumentStatusService;
 use App\Domain\Messaging\Data\OutboxEvent;
+use App\Domain\Messaging\Enums\DomainEventType;
 use App\Domain\Messaging\Services\OutboxWriter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -87,7 +88,7 @@ class SignDocumentAction
             $this->advanceDocumentStatus($document, $authUser);
 
             // Событие на каждую подпись (на нём строится доставка следующему по очереди — OPEN_QUESTIONS Q3).
-            $this->outbox->record(OutboxEvent::make('document.signed', $document->ulid, $authUser?->id, [
+            $this->outbox->record(OutboxEvent::make(DomainEventType::DocumentSigned, $document->ulid, $authUser?->id, [
                 'party_id' => $party->id,
                 'signing_order' => $party->signing_order,
                 'signature_id' => $signature->id,
@@ -95,7 +96,7 @@ class SignDocumentAction
 
             // Отдельное событие завершения конверта — для уведомления владельца.
             if ($document->status === DocumentStatus::Signed) {
-                $this->outbox->record(OutboxEvent::make('document.completed', $document->ulid, $authUser?->id, [
+                $this->outbox->record(OutboxEvent::make(DomainEventType::DocumentCompleted, $document->ulid, $authUser?->id, [
                     'completed_at' => $document->completed_at?->toISOString(),
                 ]));
             }

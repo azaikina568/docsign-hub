@@ -11,6 +11,7 @@ use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Models\SignatureToken;
 use App\Domain\Documents\Services\DocumentStatusService;
 use App\Domain\Messaging\Data\OutboxEvent;
+use App\Domain\Messaging\Enums\DomainEventType;
 use App\Domain\Messaging\Services\OutboxWriter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -70,7 +71,7 @@ class SendDocumentAction
             $this->statusService->transition($document, DocumentStatus::Pending, $actor, 'Document sent for signing.');
 
             // В payload только метаданные — без plain-токенов и email подписантов (их детали добирает consumer).
-            $this->outbox->record(OutboxEvent::make('document.sent', $document->ulid, $actor->id, [
+            $this->outbox->record(OutboxEvent::make(DomainEventType::DocumentSent, $document->ulid, $actor->id, [
                 'title' => $document->title,
                 'signers' => $signers->count(),
                 'expires_at' => $document->expires_at?->toISOString(),

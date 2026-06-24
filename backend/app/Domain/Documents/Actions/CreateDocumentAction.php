@@ -6,6 +6,7 @@ use App\Domain\Documents\Enums\DocumentStatus;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Models\DocumentStatusHistory;
 use App\Domain\Messaging\Data\OutboxEvent;
+use App\Domain\Messaging\Enums\DomainEventType;
 use App\Domain\Messaging\Services\OutboxWriter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,7 @@ class CreateDocumentAction
                 'changed_by_user_id' => $owner->id,
             ]);
 
-            $this->outbox->record(OutboxEvent::make('document.created', $document->ulid, $owner->id, [
+            $this->outbox->record(OutboxEvent::make(DomainEventType::DocumentCreated, $document->ulid, $owner->id, [
                 'title' => $document->title,
                 'status' => $document->status->value,
             ]));

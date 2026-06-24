@@ -2,6 +2,7 @@
 
 namespace App\Domain\Messaging\Data;
 
+use App\Domain\Messaging\Enums\DomainEventType;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -27,21 +28,21 @@ class OutboxEvent
     ) {}
 
     /**
-     * Тип события вида `document.signed`; routing key и тип агрегата выводятся из него (`document.signed.v1`, `document`).
+     * Собирает событие по типу из реестра `DomainEventType` (он же задаёт routing key и версию).
      *
      * @param  array<string, mixed>  $data
      */
-    public static function make(string $type, ?string $aggregateId, ?int $actorId, array $data = [], int $version = 1): self
+    public static function make(DomainEventType $type, ?string $aggregateId, ?int $actorId, array $data = []): self
     {
         return new self(
             eventId: (string) Str::orderedUuid(),
-            eventType: $type,
-            routingKey: "{$type}.v{$version}",
-            aggregateType: strtok($type, '.') ?: $type,
+            eventType: $type->value,
+            routingKey: $type->routingKey(),
+            aggregateType: $type->aggregateType(),
             aggregateId: $aggregateId,
             actorId: $actorId,
             occurredAt: now(),
-            version: $version,
+            version: $type->version(),
             data: $data,
         );
     }

@@ -74,7 +74,9 @@ class DocumentCrudTest extends TestCase
 
         $this->getJson("/api/v1/documents/{$document->ulid}")
             ->assertOk()
-            ->assertJsonPath('data.id', $document->ulid);
+            ->assertJsonPath('data.id', $document->ulid)
+            // content_hash — внутренний integrity-артефакт, наружу не отдаётся.
+            ->assertJsonMissingPath('data.content_hash');
 
         // Внутренний int PK наружу не выставляется и не резолвится в URL.
         $this->getJson("/api/v1/documents/{$document->id}")->assertNotFound();

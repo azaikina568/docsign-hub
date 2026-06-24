@@ -25,6 +25,10 @@ Every event shares the same envelope (see the `*.example.json` files):
 `document.created.v1`, `document.sent.v1`, `document.signed.v1`, `document.completed.v1`,
 `document.cancelled.v1`, `document.expired.v1`.
 
+The authoritative list of event types, versions and routing keys is the `DomainEventType` enum
+(`backend/app/Domain/Messaging/Enums`). These `*.example.json` files illustrate the payload shape;
+machine-checkable JSON Schemas (`*.schema.json`) and an AsyncAPI catalog are planned.
+
 ## Rules
 
 - Payloads are stable and explicit — never serialize full Eloquent models.

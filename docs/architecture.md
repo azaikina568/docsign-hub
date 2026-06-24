@@ -67,7 +67,9 @@ possession of the token. See **Signing** below.
 
 **content_hash.** Set at `send` to a SHA-256 of the signable snapshot (today: title + ordered
 parties; later: the uploaded file). Each signature binds to it (`signature_hash` derives from it), so
-a later content change is detectable against existing signatures.
+a later content change is detectable against existing signatures. It is an **internal** integrity
+artifact — not exposed in the document API (no client use, and raw internal hashes are needless
+information disclosure); a future signature-verification endpoint would surface it with context.
 
 **Signing tokens.** `send` issues one signing token per signer; only its SHA-256 hash is stored.
 The plain token is never returned to the sender — it is delivered to each signer's own email
@@ -159,10 +161,13 @@ phantom events). Events recorded today: `document.created` (create), `document.s
 `document.signed` (per signature), `document.completed` (envelope fully signed), `document.cancelled`
 (cancel), `document.expired` (expiration command).
 
-Each event is a stable, versioned envelope (`event_id`, `event_type`, `routing_key` `*.vN`,
-`occurred_at`, `aggregate_id`, `actor_id`, `data`) — never a serialized Eloquent model, and with **no
-secrets or PII** (signing tokens and participant emails stay out of events). Shapes are documented in
-`contracts/events/v1`. `outbox_messages` has no foreign key to documents (it references the document
+Event types live in one registry — the `DomainEventType` enum (single source of truth for type,
+version and routing key), so producers and consumers never drift on magic strings. Each event is a
+stable, versioned envelope (`event_id`, `event_type`, `routing_key` `*.vN`, `occurred_at`,
+`aggregate_id`, `actor_id`, `data`) — never a serialized Eloquent model, and with **no secrets or
+PII** (signing tokens and participant emails stay out of events). Shapes are documented in
+`contracts/events/v1` (machine-checkable JSON Schemas and an AsyncAPI catalog are planned — see
+`plans/MESSAGING_DESIGN.md`). `outbox_messages` has no foreign key to documents (it references the document
 ULID and carries a self-contained payload), so the messaging concern is not coupled to the domain
 schema and can move to a separate service later.
 

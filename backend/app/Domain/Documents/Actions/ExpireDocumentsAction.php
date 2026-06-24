@@ -6,6 +6,7 @@ use App\Domain\Documents\Enums\DocumentStatus;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Services\DocumentStatusService;
 use App\Domain\Messaging\Data\OutboxEvent;
+use App\Domain\Messaging\Enums\DomainEventType;
 use App\Domain\Messaging\Services\OutboxWriter;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,7 @@ class ExpireDocumentsAction
                     $this->statusService->transition($document, DocumentStatus::Expired, null, 'Document expired.');
 
                     // actor = null: документ закрыла система по расписанию, не пользователь.
-                    $this->outbox->record(OutboxEvent::make('document.expired', $document->ulid, null, [
+                    $this->outbox->record(OutboxEvent::make(DomainEventType::DocumentExpired, $document->ulid, null, [
                         'expired_at' => now()->toISOString(),
                     ]));
                 });

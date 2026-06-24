@@ -10,6 +10,7 @@ api-flow-log.md
 
 .idea/
 .vscode/
+.code-inspection/
 .DS_Store
 Thumbs.db
 

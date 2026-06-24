@@ -7,6 +7,7 @@ use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Services\DocumentStatusService;
 use App\Domain\Messaging\Data\OutboxEvent;
+use App\Domain\Messaging\Enums\DomainEventType;
 use App\Domain\Messaging\Services\OutboxWriter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +30,7 @@ class CancelDocumentAction
         DB::transaction(function () use ($document, $actor, $reason) {
             $this->statusService->transition($document, DocumentStatus::Cancelled, $actor, $reason);
 
-            $this->outbox->record(OutboxEvent::make('document.cancelled', $document->ulid, $actor->id, [
+            $this->outbox->record(OutboxEvent::make(DomainEventType::DocumentCancelled, $document->ulid, $actor->id, [
                 'reason' => $reason,
             ]));
         });
