@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Documents\Models\Document;
+use App\Domain\Users\Notifications\QueuedVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -66,5 +67,13 @@ class User extends Authenticatable implements MustVerifyEmail
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, 'owner_id');
+    }
+
+    /**
+     * Шлём подтверждение email через очередь (см. QueuedVerifyEmail) — не блокируем запрос регистрации почтой.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new QueuedVerifyEmail);
     }
 }

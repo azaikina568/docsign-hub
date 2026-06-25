@@ -4,7 +4,8 @@ import { clearTokens, getAccessToken, getRefreshToken, setTokens } from './token
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
 
-export const api = axios.create({ baseURL, timeout: 10000 })
+// Запас по таймауту: в dev на Windows запросы через bind-mount бывают медленными; в проде ответы быстрые.
+export const api = axios.create({ baseURL, timeout: 15000 })
 
 // Помечаем запрос, чтобы повторить его максимум один раз после refresh (без бесконечной петли на 401).
 interface RetriableConfig extends InternalAxiosRequestConfig {

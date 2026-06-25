@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
@@ -69,6 +70,14 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        // Требования к паролю: минимум буквы и цифры; в проде дополнительно регистр, символ и
+        // проверка по утечкам (HaveIBeenPwned). Полный спек политики — plans/SECURITY.md.
+        Password::defaults(function () {
+            $rule = Password::min(8)->letters()->numbers();
+
+            return $this->app->isProduction() ? $rule->mixedCase()->symbols()->uncompromised() : $rule;
+        });
 
         Gate::policy(Document::class, DocumentPolicy::class);
     }

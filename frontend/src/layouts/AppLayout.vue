@@ -25,6 +25,13 @@ async function onLogout(): Promise<void> {
     </header>
 
     <main class="mx-auto max-w-5xl px-4 py-6">
+      <div
+        v-if="!auth.emailVerified"
+        class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+      >
+        Please verify your email to start creating documents. Check your inbox for the confirmation link.
+      </div>
+
       <slot />
     </main>
   </div>

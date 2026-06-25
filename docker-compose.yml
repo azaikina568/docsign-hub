@@ -48,6 +48,24 @@ services:
       redis:
         condition: service_started
 
+  # Воркер очереди Laravel: фоновые задачи приложения (письмо подтверждения email и т.п.),
+  # чтобы они не блокировали HTTP-запрос. Доменные события идут отдельным каналом (RabbitMQ/outbox).
+  queue-worker:
+    build:
+      context: ./infra/docker/php
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/var/www/html
+    command: sh -c "until [ -f vendor/autoload.php ]; do sleep 2; done; php artisan queue:work --tries=3 --max-time=3600"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   # Воркер-публишер: вычитывает outbox и шлёт события в RabbitMQ (transactional outbox).
   publisher:
     build:

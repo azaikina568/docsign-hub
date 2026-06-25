@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Domain\Users\Notifications\QueuedVerifyEmail;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -38,7 +38,7 @@ class EmailVerificationTest extends TestCase
         ])->assertCreated()->assertJsonPath('user.email_verified_at', null);
 
         $user = User::where('email', 'jane@example.com')->firstOrFail();
-        Notification::assertSentTo($user, VerifyEmail::class);
+        Notification::assertSentTo($user, QueuedVerifyEmail::class);
     }
 
     public function test_email_is_verified_via_signed_link(): void
@@ -92,7 +92,7 @@ class EmailVerificationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('message', 'Verification link sent.');
 
-        Notification::assertSentTo($user, VerifyEmail::class);
+        Notification::assertSentTo($user, QueuedVerifyEmail::class);
     }
 
     public function test_resend_is_noop_for_verified_user(): void

@@ -14,7 +14,19 @@ const router = createRouter({
     {
       path: '/',
       name: 'dashboard',
-      component: () => import('@/pages/DashboardPage.vue'),
+      component: () => import('@/pages/documents/DocumentsListPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/documents/new',
+      name: 'document-create',
+      component: () => import('@/pages/documents/DocumentCreatePage.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/documents/:id',
+      name: 'document-detail',
+      component: () => import('@/pages/documents/DocumentDetailPage.vue'),
       meta: { requiresAuth: true },
     },
     {

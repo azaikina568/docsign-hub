@@ -8,10 +8,10 @@ return [
     'signing_token_ttl_days' => (int) env('DOCSIGN_SIGNING_TOKEN_TTL_DAYS', 14),
 
     /*
-     * База ссылки для подписания, которая уходит участнику в письме.
-     * Реальную страницу подписания отдаёт frontend; сюда подставляется plain-токен.
+     * База ссылки для подписания, которая уходит участнику в письме: страницу подписания отдаёт
+     * frontend (SPA), поэтому ссылка ведёт на FRONTEND_URL, а не на API. Сюда подставляется plain-токен.
      */
-    'signing_url_base' => env('DOCSIGN_SIGNING_URL_BASE', env('APP_URL', 'http://localhost:8080').'/sign'),
+    'signing_url_base' => env('DOCSIGN_SIGNING_URL_BASE', env('FRONTEND_URL', 'http://localhost:3000').'/signing'),
 
     /*
      * Путь к Mermaid-диаграммам, которые отдаёт страница /docs/diagrams.

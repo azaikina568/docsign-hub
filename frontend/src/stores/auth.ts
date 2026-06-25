@@ -9,7 +9,7 @@ import router from '@/router'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
-  // Стартуем как «возможно залогинен», если в localStorage уже есть токен (до подтверждения через /me).
+  // Флаг, чтобы восстановление сессии (init) отработало ровно один раз.
   const initialized = ref(false)
 
   const isAuthenticated = computed(() => user.value !== null)
