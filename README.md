@@ -10,8 +10,8 @@ DocSign Hub — демонстрационный сервис электронн
 
 Бэкенд закрывает основной поток подписания: аутентификация (с верификацией email), документы и строго
 последовательное подписание по модели «capability или identity». Доменные события идут через transactional
-outbox в RabbitMQ, а consumer'ы рассылают приглашения по очереди и пишут audit в MongoDB. Frontend пока —
-каркас с проверкой API; полноценный UI — следующий шаг (см. [Roadmap](#roadmap)).
+outbox в RabbitMQ, а consumer'ы рассылают приглашения по очереди и пишут audit в MongoDB. На фронте заложена
+аутентификация (login/register, прозрачный refresh, защищённые роуты); остальной UI — в работе (см. [Roadmap](#roadmap)).
 
 ## Стек
 
@@ -63,7 +63,8 @@ outbox в RabbitMQ, а consumer'ы рассылают приглашения п�
 **Прочее**
 - `GET /api/v1/health`, интерактивная API-документация на `/docs/api` (генерируется из кода), отрисованные
   диаграммы на `/docs/diagrams`.
-- Базовый frontend-экран с проверкой API health.
+- Frontend (Vue 3 SPA): аутентификация — register/login/logout, **прозрачный refresh** access-токена по 401
+  (один refresh на пачку параллельных запросов), защищённые роуты, dashboard с баннером верификации email.
 
 ## Roadmap
 
@@ -171,7 +172,7 @@ GitHub и на `/docs/diagrams`).
 
 ```
 backend/    Laravel 12 API (app/Domain, app/Http, config, database, tests)
-frontend/   Vue 3 + TS + Vite (каркас)
+frontend/   Vue 3 + TS + Vite SPA (auth-фундамент: api-клиент, refresh, stores, router, pages)
 contracts/  версионированные контракты событий (JSON Schema) для RabbitMQ
 docs/       architecture.md, diagrams.md
 infra/      Docker-обвязка (nginx, php Dockerfile)
