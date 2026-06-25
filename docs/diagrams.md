@@ -262,41 +262,45 @@ Access-токен ходит в API (ability `access-api`), refresh — толь
 
 ## Верификация email (sequence)
 
-**Что показывает:** как подтверждается email — от регистрации до перехода по подписанной ссылке из письма.
-Ссылка верификации публична: её подпись и есть capability (доказательство контроля над ящиком), поэтому
-Bearer не нужен. Источник истины — `RegisterUserAction` и `EmailVerificationController`.
+**Что показывает:** как подтверждается email — от регистрации до перехода по ссылке из письма. Письмо ведёт
+на страницу SPA, а та переотправляет подписанный query (signature/expires) в API. Подпись и есть capability
+(доказательство контроля над ящиком), поэтому Bearer не нужен. Письмо уходит через очередь (queue-worker),
+а не синхронно. Источник истины — `RegisterUserAction`, `QueuedVerifyEmail`, `EmailVerificationController`.
 
 ```mermaid
 sequenceDiagram
     actor User
     participant API as AuthController /register
-    participant Act as RegisterUserAction
+    participant Q as queue-worker
     participant Mail as Mailpit / провайдер
+    participant SPA as Frontend /verify-email
     participant V as EmailVerificationController
 
     User->>API: POST /auth/register
-    API->>Act: execute(data)
-    Act->>Mail: событие Registered шлёт письмо со подписанной ссылкой
+    API->>Q: ставим письмо верификации в очередь
     API-->>User: 201 user (email_verified_at null) и токены
-    Mail-->>User: ссылка GET /auth/verify/{id}/{hash}
-    User->>V: переход по подписанной ссылке
+    Q->>Mail: письмо со ссылкой на SPA (signature в query)
+    Mail-->>User: ссылка FRONTEND_URL/verify-email/{id}/{hash}
+    User->>SPA: переход по ссылке из письма
+    SPA->>V: GET /auth/verify/{id}/{hash} с тем же подписанным query
     Note over V: middleware signed проверил подпись и срок
     alt уже подтверждён
-        V-->>User: 200 already verified
+        V-->>SPA: 200 already verified
     else подпись валидна и hash совпал
         V->>V: markEmailAsVerified, событие Verified
-        V-->>User: 200 email verified
+        V-->>SPA: 200 email verified
     end
 ```
 
 Создавать документы можно только с подтверждённым email (`DocumentPolicy::create`). Повторная отправка
-ссылки — `POST /auth/verification/resend` под логином, с тугим `throttle:verification`.
+ссылки — `POST /auth/verification/resend` под логином, с тугим `throttle:verification`. Ссылка подписания
+в письме точно так же ведёт на SPA (`FRONTEND_URL/signing/{token}`), а не на API.
 
 ## Развёртывание (контейнеры)
 
 **Что показывает:** какие контейнеры есть и кто с кем общается. Сплошные стрелки — рантайм, пунктир —
-dev-почта. `publisher` вычитывает outbox в брокер; два consumer'а читают из брокера: уведомления шлют письма,
-audit пишет в MongoDB.
+dev-почта. `publisher` вычитывает outbox в брокер; два consumer'а читают из брокера (уведомления шлют письма,
+audit пишет в MongoDB); `queue-worker` шлёт фоновые письма приложения (подтверждение email).
 
 ```mermaid
 flowchart LR
@@ -304,17 +308,20 @@ flowchart LR
     nginx -->|FastCGI| backend["backend (php-fpm, Laravel 12)"]
     scheduler["scheduler (schedule:work)"]
     publisher["publisher (outbox:publish)"]
+    qworker["queue-worker (queue:work)"]
     cnotif["consumer-notifications"]
     caudit["consumer-audit"]
     backend --> postgres[("PostgreSQL")]
     backend --> redis[("Redis: cache, rate-limit, locks")]
     scheduler --> postgres
     publisher --> postgres
+    qworker --> postgres
+    qworker -.->|dev| mailpit["Mailpit"]
     publisher -->|события| rabbitmq["RabbitMQ"]
     rabbitmq --> cnotif
     rabbitmq --> caudit
     cnotif --> postgres
-    cnotif -.->|dev| mailpit["Mailpit"]
+    cnotif -.->|dev| mailpit
     caudit --> mongodb[("MongoDB: audit")]
     backend -.->|dev| mailpit
 ```

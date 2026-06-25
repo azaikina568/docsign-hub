@@ -35,3 +35,16 @@ export async function me(): Promise<User> {
 export async function logout(): Promise<void> {
   await api.post('/auth/logout')
 }
+
+// Подтверждение email: query (signature/expires из письма) переносим в URL как есть — подпись API-роута.
+export async function verifyEmail(id: string, hash: string, signedQuery: string): Promise<{ message: string }> {
+  const { data } = await api.get<{ message: string }>(`/auth/verify/${id}/${hash}?${signedQuery}`)
+
+  return data
+}
+
+export async function resendVerification(): Promise<{ message: string }> {
+  const { data } = await api.post<{ message: string }>('/auth/verification/resend')
+
+  return data
+}

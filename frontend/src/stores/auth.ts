@@ -65,5 +65,12 @@ export const useAuthStore = defineStore('auth', () => {
     initialized.value = true
   }
 
-  return { user, initialized, isAuthenticated, emailVerified, register, login, logout, init, reset }
+  // Перечитать профиль (напр. после подтверждения email — обновить email_verified_at и убрать баннер).
+  async function refresh(): Promise<void> {
+    if (getAccessToken()) {
+      user.value = await authApi.me()
+    }
+  }
+
+  return { user, initialized, isAuthenticated, emailVerified, register, login, logout, init, refresh, reset }
 })

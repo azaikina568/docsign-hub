@@ -41,6 +41,24 @@ class EmailVerificationTest extends TestCase
         Notification::assertSentTo($user, QueuedVerifyEmail::class);
     }
 
+    public function test_verification_email_links_to_frontend_and_api_accepts_forwarded_signature(): void
+    {
+        config(['app.frontend_url' => 'http://frontend.test']);
+        $user = User::factory()->unverified()->create();
+
+        // Ссылка в письме ведёт на SPA, а не на API; подписанный query переносится как есть.
+        $url = (new QueuedVerifyEmail)->toMail($user)->actionUrl;
+        $this->assertStringStartsWith("http://frontend.test/verify-email/{$user->id}/", (string) $url);
+        $this->assertStringContainsString('signature=', (string) $url);
+
+        // SPA переотправляет те же id/hash/query в API — подпись валидна, email подтверждается.
+        $query = parse_url((string) $url, PHP_URL_QUERY);
+        $hash = sha1($user->getEmailForVerification());
+        $this->getJson("/api/v1/auth/verify/{$user->id}/{$hash}?{$query}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Email verified.');
+    }
+
     public function test_email_is_verified_via_signed_link(): void
     {
         $user = User::factory()->unverified()->create();

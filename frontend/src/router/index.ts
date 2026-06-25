@@ -30,6 +30,23 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/signing-requests',
+      name: 'signing-requests',
+      component: () => import('@/pages/signing/SigningRequestsPage.vue'),
+      meta: { requiresAuth: true },
+    },
+    // Публичные страницы по ссылке из письма — без auth (внешний участник может быть не залогинен).
+    {
+      path: '/signing/:token',
+      name: 'sign',
+      component: () => import('@/pages/signing/SignPage.vue'),
+    },
+    {
+      path: '/verify-email/:id/:hash',
+      name: 'verify-email',
+      component: () => import('@/pages/auth/VerifyEmailPage.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('@/pages/auth/LoginPage.vue'),
