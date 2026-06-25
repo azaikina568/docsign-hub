@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $signing_order
  * @property PartyStatus $status
  * @property Carbon|null $signed_at
+ * @property Carbon|null $invited_at
  */
 class DocumentParty extends Model
 {
@@ -38,6 +39,7 @@ class DocumentParty extends Model
         'signing_order',
         'status',
         'signed_at',
+        'invited_at',
     ];
 
     protected function casts(): array
@@ -47,6 +49,7 @@ class DocumentParty extends Model
             'status' => PartyStatus::class,
             'signing_order' => 'integer',
             'signed_at' => 'datetime',
+            'invited_at' => 'datetime',
         ];
     }
 

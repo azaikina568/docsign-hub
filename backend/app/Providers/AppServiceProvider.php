@@ -3,18 +3,17 @@
 namespace App\Providers;
 
 use App\Domain\Documents\Contracts\SigningInvitationNotifier;
-use App\Domain\Documents\Events\DocumentSent;
-use App\Domain\Documents\Listeners\SendSigningInvitations;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Policies\DocumentPolicy;
+use App\Domain\Messaging\Contracts\AuditStore;
 use App\Domain\Messaging\Contracts\EventPublisher;
+use App\Infrastructure\Messaging\MongoAuditStore;
 use App\Infrastructure\Messaging\RabbitMqConnection;
 use App\Infrastructure\Messaging\RabbitMqEventPublisher;
 use App\Infrastructure\Notifications\MailSigningInvitationNotifier;
 use App\Models\PersonalAccessToken;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
             $app->make(RabbitMqConnection::class),
             (string) config('messaging.rabbitmq.exchange'),
         ));
+
+        // Audit-журнал в MongoDB (append-only); в тестах подменяется фейком.
+        $this->app->singleton(AuditStore::class, fn () => new MongoAuditStore(config('messaging.audit')));
     }
 
     /**
@@ -69,7 +71,5 @@ class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Gate::policy(Document::class, DocumentPolicy::class);
-
-        Event::listen(DocumentSent::class, SendSigningInvitations::class);
     }
 }

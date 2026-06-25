@@ -26,8 +26,16 @@ Every event shares the same envelope (see the `*.example.json` files):
 `document.cancelled.v1`, `document.expired.v1`.
 
 The authoritative list of event types, versions and routing keys is the `DomainEventType` enum
-(`backend/app/Domain/Messaging/Enums`). These `*.example.json` files illustrate the payload shape;
-machine-checkable JSON Schemas (`*.schema.json`) and an AsyncAPI catalog are planned.
+(`backend/app/Domain/Messaging/Enums`). The `*.example.json` files illustrate the payload shape; the
+`*.schema.json` files are machine-checkable JSON Schemas validated against every recorded event in
+`EventContractTest`. An AsyncAPI catalog is planned.
+
+## Consumers
+
+Two consumers read these events (queues bound to `document.*.v1`): **notifications** (sequential signing
+invitations and the expiry notice) and **audit** (append-only MongoDB journal). Delivery is at-least-once;
+each consumer dedups on `event_id` (carried as the AMQP `message_id`) via an inbox, so a redelivered event
+is processed once.
 
 ## Rules
 

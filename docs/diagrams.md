@@ -3,13 +3,14 @@
 Mermaid-диаграммы. Рендерятся прямо на GitHub, а локально открываются как страница приложения на
 `/docs/diagrams` (этот же файл, отрисованный mermaid.js — по аналогии с `/docs/api`). Держим их в
 синхроне с кодом: схема БД — с миграциями, state machine — с `DocumentStatus::allowedTransitions()`,
-sequence — с `SendDocumentAction` и листенерами.
+sequence — с `SendDocumentAction`, `SignDocumentAction` и consumer'ами.
 
 Каждый раздел: сначала «что показывает», затем сама диаграмма, при необходимости — «как читать».
 Содержание: [ERD](#схема-данных-erd) · [статусы документа](#жизненный-цикл-документа-state-machine) ·
-[отправка на подписание](#отправка-на-подписание-sequence) · [обновление токенов](#обновление-токенов-sequence) ·
+[отправка на подписание](#отправка-на-подписание-sequence) · [поэтапная рассылка приглашений](#поэтапная-рассылка-приглашений-sequence) ·
+[обновление токенов](#обновление-токенов-sequence) ·
 [верификация email](#верификация-email-sequence) · [развёртывание](#развёртывание-контейнеры) ·
-[события и очереди](#события-и-очереди-план-этап-5).
+[события и очереди](#события-и-очереди).
 
 ## Схема данных (ERD)
 
@@ -50,6 +51,7 @@ erDiagram
         smallint signing_order "nullable: только у signer"
         string status "enum PartyStatus"
         timestamp signed_at "nullable"
+        timestamp invited_at "nullable: приглашение доставлено"
     }
     signature_tokens {
         bigint id PK
@@ -88,13 +90,21 @@ erDiagram
         timestamp available_at "когда публиковать"
         timestamp published_at "nullable"
     }
+    inbox_messages {
+        bigint id PK
+        string consumer "notifications|audit"
+        string event_id "UK с consumer: дедуп доставки"
+        timestamp processed_at
+    }
 ```
 
 Уникальные ключи: `documents.ulid`, `document_parties(document_id, email)`, `signature_tokens.token_hash`,
-`signatures.document_party_id`, `outbox_messages.event_id`. Составной индекс `documents(owner_id, status, created_at)`
-под список владельца; `outbox_messages(status, available_at)` под выборку publisher'ом.
-`outbox_messages` стоит особняком (без FK): ссылается на документ по ULID и хранит самодостаточный payload —
-так контекст обмена сообщениями не связан схемой с доменом и его можно вынести в отдельный сервис.
+`signatures.document_party_id`, `outbox_messages.event_id`, `inbox_messages(consumer, event_id)`. Составной индекс
+`documents(owner_id, status, created_at)` под список владельца; `outbox_messages(status, available_at)` под выборку
+publisher'ом. `outbox_messages`/`inbox_messages` стоят особняком (без FK): ссылаются на документ по ULID и хранят
+самодостаточный payload — так контекст обмена сообщениями не связан схемой с доменом и его можно вынести в отдельный
+сервис. `inbox_messages` — идемпотентность consumer'ов: повторная доставка (at-least-once) того же `event_id` тому же
+consumer'у не повторяет эффект.
 
 ## Жизненный цикл документа (state machine)
 
@@ -121,8 +131,9 @@ stateDiagram-v2
 
 ## Отправка на подписание (sequence)
 
-**Что показывает:** что происходит по `POST /documents/{ulid}/send` — от запроса владельца до письма
-подписанту. Голубая рамка — одна транзакция БД (всё внутри либо коммитится, либо откатывается вместе).
+**Что показывает:** что происходит по `POST /documents/{ulid}/send`. Сама отправка только фиксирует
+состояние и пишет событие `document.sent` в outbox; письмо подписанту уходит асинхронно — через publisher
+и consumer уведомлений (см. [события и очереди](#события-и-очереди)). Голубая рамка — одна транзакция БД.
 
 ```mermaid
 sequenceDiagram
@@ -130,11 +141,6 @@ sequenceDiagram
     participant API as SendDocumentController
     participant Act as SendDocumentAction
     participant DB as PostgreSQL
-    participant Ev as DocumentSent (event)
-    participant L as SendSigningInvitations
-    participant N as SigningInvitationNotifier
-    participant Mail as Mailpit / провайдер
-    actor Signer
 
     Owner->>API: POST /documents/{ulid}/send (Bearer)
     API->>Act: execute(document, owner)
@@ -143,18 +149,48 @@ sequenceDiagram
     Act->>DB: BEGIN
     Act->>DB: на каждого signer создаём signature_token (hash, TTL)
     Act->>DB: ставим expires_at, статус draft в pending, пишем history
+    Act->>DB: пишем outbox document.sent (только метаданные)
     Act->>DB: COMMIT
     end
-    Act-->>Ev: dispatch после commit
-    Ev->>L: handle
-    L->>N: notify документа и invitation на каждого signer
-    N->>Mail: письмо с персональной ссылкой (plain-токен)
-    Mail-->>Signer: приглашение подписать
     API-->>Owner: 200 без токенов в ответе
 ```
 
-Plain-токен живёт только в памяти (`SigningInvitation`) и уходит подписанту письмом; отправителю не
-возвращается. Рассылка — после commit, чтобы сбой доставки не откатывал отправку.
+Запрос на send не блокируется почтой: доставка вынесена за очередь. Plain-токены отправителю не
+возвращаются и в payload события не попадают.
+
+## Поэтапная рассылка приглашений (sequence)
+
+**Что показывает:** как приглашения уходят по очереди (OPEN_QUESTIONS Q3), а не всем сразу. Consumer
+уведомлений на `document.sent` зовёт первого по очереди, на каждый `document.signed` (пока документ не
+завершён) — следующего. Источник истины — `NotificationsConsumer` и `SigningInvitationCoordinator`.
+
+```mermaid
+sequenceDiagram
+    participant Q as queue docsign.notifications
+    participant C as NotificationsConsumer
+    participant Co as SigningInvitationCoordinator
+    participant DB as PostgreSQL
+    participant Mail as Mailpit / провайдер
+    actor Signer
+
+    Q->>C: document.sent.v1 / document.signed.v1
+    C->>Co: inviteCurrentSigner(document)
+    alt документ открыт, есть неподписавший signer, ещё не приглашён
+        Co->>DB: текущий по очереди signer (invited_at null)
+        Co->>DB: перевыпуск токена (новый hash, тот же дедлайн)
+        Co->>Mail: письмо с персональной ссылкой (свежий plain-токен)
+        Mail-->>Signer: приглашение подписать
+        Co->>DB: invited_at = now (после успешной отправки)
+    else завершён, некого звать или уже приглашён
+        Note over Co: no-op
+    end
+```
+
+Plain-токен не хранится, поэтому к моменту отложенной доставки его уже нет — coordinator перевыпускает
+токен подписанта прямо при рассылке. Так emailed-ссылка всегда одноразовая, а в БД лежит только хеш.
+Двойное приглашение исключено двумя слоями: `invited_at` на участнике (одному текущему подписанту письмо
+уходит ровно раз, даже если на него указали и `sent`, и `signed`) и inbox по `event_id` (повторная доставка
+того же события). Перевыпуск без `invited_at` мог бы инвалидировать уже отправленную ссылку.
 
 ## Подписание участником (sequence)
 
@@ -258,8 +294,9 @@ sequenceDiagram
 
 ## Развёртывание (контейнеры)
 
-**Что показывает:** какие контейнеры есть и кто с кем общается. Сплошные стрелки — текущий рантайм,
-пунктир — dev-почта и заготовка под audit-consumer (Этап 5c).
+**Что показывает:** какие контейнеры есть и кто с кем общается. Сплошные стрелки — рантайм, пунктир —
+dev-почта. `publisher` вычитывает outbox в брокер; два consumer'а читают из брокера: уведомления шлют письма,
+audit пишет в MongoDB.
 
 ```mermaid
 flowchart LR
@@ -267,31 +304,41 @@ flowchart LR
     nginx -->|FastCGI| backend["backend (php-fpm, Laravel 12)"]
     scheduler["scheduler (schedule:work)"]
     publisher["publisher (outbox:publish)"]
+    cnotif["consumer-notifications"]
+    caudit["consumer-audit"]
     backend --> postgres[("PostgreSQL")]
     backend --> redis[("Redis: cache, rate-limit, locks")]
     scheduler --> postgres
     publisher --> postgres
     publisher -->|события| rabbitmq["RabbitMQ"]
-    backend -.->|dev| mailpit["Mailpit"]
-    rabbitmq -.->|stage 5c| mongodb[("MongoDB: audit")]
+    rabbitmq --> cnotif
+    rabbitmq --> caudit
+    cnotif --> postgres
+    cnotif -.->|dev| mailpit["Mailpit"]
+    caudit --> mongodb[("MongoDB: audit")]
+    backend -.->|dev| mailpit
 ```
 
-## События и очереди (Этап 5)
+## События и очереди
 
-**Что показывает:** путь доменного события. **Сделано (5a+5b):** действие в своей транзакции пишет строку в
-`outbox_messages`; publisher-воркер вычитывает готовые строки и публикует в topic-exchange `docsign.events`
-(publisher confirms), очереди их копят. **Следующее (5c):** consumers (уведомления + audit в MongoDB); отвергнутые
-(nack) уходят в dead-letter. Сплошное — реализовано, пунктир — план.
+**Что показывает:** полный путь доменного события. Действие в своей транзакции пишет строку в
+`outbox_messages` (5a); publisher вычитывает готовые строки и публикует в topic-exchange `docsign.events`
+с publisher confirms (5b); два consumer'а читают свои очереди (5c) — уведомления шлют письма, audit пишет в
+MongoDB, дедуп по `event_id` (inbox). Отвергнутые (nack) уходят в dead-letter на ручной разбор. Пунктир —
+путь ошибки.
 
 ```mermaid
 flowchart LR
-    action["Domain Action (в транзакции)"] -->|5a| outbox[("outbox_messages")]
-    outbox -->|5b| publisher["publisher (worker)"]
+    action["Domain Action (в транзакции)"] --> outbox[("outbox_messages")]
+    outbox --> publisher["publisher (worker)"]
     publisher --> ex{{"exchange docsign.events (topic)"}}
     ex -->|document.*.v1| qn["queue: notifications"]
     ex -->|document.*.v1| qa["queue: audit"]
-    qn -.->|nack 5c| dlx{{"docsign.dlx"}}
-    qa -.->|nack 5c| dlx
+    qn --> cnotif["consumer-notifications"]
+    qa --> caudit["consumer-audit"]
+    cnotif --> mail["письма: приглашения, истечение"]
+    caudit --> mongo[("MongoDB: audit_events")]
+    qn -.->|nack| dlx{{"docsign.dlx"}}
+    qa -.->|nack| dlx
     dlx -.-> dlq[("docsign.dlq")]
-    qa -.->|5c| mongo[("MongoDB")]
 ```

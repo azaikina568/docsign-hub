@@ -10,11 +10,13 @@ rendered on GitHub and served in-app at `/docs/diagrams` (same file via mermaid.
 - `nginx` serves the Laravel API through PHP-FPM.
 - `backend` runs Laravel 12 on PHP 8.4 in Docker.
 - `scheduler` is a dedicated container running `php artisan schedule:work` (drives `documents:expire`).
+- `publisher` reads the outbox and publishes domain events (`outbox:publish --daemon`).
+- `consumer-notifications` / `consumer-audit` read RabbitMQ and deliver emails / write the audit log.
 - `frontend` runs Vue 3 + TypeScript + Vite.
 - `postgres` stores business data.
 - `redis` is reserved for cache, rate limiting and short locks.
-- `rabbitmq` is reserved for domain events through an outbox publisher.
-- `mongodb` is reserved for audit events and flexible event payloads.
+- `rabbitmq` carries domain events (topic exchange `docsign.events`) from the outbox publisher.
+- `mongodb` stores the append-only audit log (`audit_events`).
 - `mailpit` is used for local demo notifications.
 
 ## Backend Direction
@@ -72,15 +74,23 @@ artifact — not exposed in the document API (no client use, and raw internal ha
 information disclosure); a future signature-verification endpoint would surface it with context.
 
 **Signing tokens.** `send` issues one signing token per signer; only its SHA-256 hash is stored.
-The plain token is never returned to the sender — it is delivered to each signer's own email
-(Mailpit in dev) through a `SigningInvitationNotifier`. Every token expires at the document's deadline
+The plain token is never returned to the sender. Every token expires at the document's deadline
 (see Expiration above), so a token is never open-ended.
 
-**Decoupling seam.** `SendDocumentAction` raises a domain event `DocumentSent` after commit; the
-`SendSigningInvitations` listener delivers invitations via the `SigningInvitationNotifier` contract
-(infra implementation: `MailSigningInvitationNotifier`). This is the seam where the RabbitMQ outbox
-and audit writers will hook in (Этап 5) without touching the action — and the boundary along which
-notifications/audit could later move into separate services.
+**Sequential invitation delivery.** Signing is strictly sequential, so invitations are delivered the
+same way — one at a time, not all at once (OPEN_QUESTIONS Q3). `send` no longer emails anyone
+synchronously; it records `document.sent` and returns. The notifications consumer drives delivery:
+on `document.sent` it invites the first signer, on each `document.signed` (while the document is not
+complete) the next. `SigningInvitationCoordinator` finds the current-turn signer; `DeliverSigningInvitationAction`
+**re-mints** that signer's token at delivery time (fresh random plain → new hash, same deadline) and
+sends it via the `SigningInvitationNotifier` contract (`MailSigningInvitationNotifier`). Re-minting is
+why the plain token need not be stored: the link is generated when the email is sent, so the database
+still keeps only a hash. Delivery is **idempotent per signer** via `document_parties.invited_at` (set
+only after a successful send): a signer is emailed once even when several events point at them — e.g. an
+account-bound signer signs from the dashboard before `document.sent` is processed, so both `sent` and the
+resulting `signed` would otherwise resolve to the same next signer. Without that guard a second delivery
+would re-mint and invalidate the link already in the signer's inbox. This is also the boundary along which
+notification delivery could move into a separate service — the action and contract stay put.
 
 **Signing.** `SignDocumentAction` is the single entry for both scenarios. Public capability path:
 `GET /signing/{token}` returns a party's own context (no other parties' data — only aggregate
@@ -180,7 +190,25 @@ row is marked `published`; on failure `attempts` is incremented with exponential
 dead-letter for manual inspection. The AMQP `message_id` carries the `event_id` so consumers can dedup
 (delivery is at-least-once). `messaging:setup` declares the topology idempotently (the topic exchange,
 a `docsign.dlx`/`docsign.dlq` dead-letter pair, and the durable `docsign.notifications`/`docsign.audit`
-queues bound to `document.*.v1`). The notifications/audit consumers (MongoDB) are the next step.
+queues bound to `document.*.v1`).
+
+**Consumers.** Two long-running workers (`messaging:consume {name}`, one container each) read their
+queue with manual ack and `prefetch=1`. `RabbitMqConsumer` decodes the envelope into an `InboundEvent`,
+the command wraps each message with `InboxGuard` (a `(consumer, event_id)` claim in `inbox_messages`)
+for idempotency, then dispatches to an `EventConsumer`. On success the message is acked; on failure the
+inbox claim is released and the message is nacked without requeue, so it dead-letters to `docsign.dlq`
+for manual replay rather than hot-looping. The two consumers:
+
+- **notifications** (`NotificationsConsumer`) → drives sequential invitation delivery (see above) and,
+  on `document.expired`, emails the owner that the document lapsed.
+- **audit** (`AuditConsumer`) → appends every event to an immutable MongoDB collection (`audit_events`)
+  via the `AuditStore` contract (`MongoAuditStore`). The Mongo `_id` is the `event_id` with an
+  upsert-`$setOnInsert`, so a redelivered event never overwrites what was recorded.
+
+Consumers scale horizontally — competing consumers on a queue is RabbitMQ's native pattern and the inbox
+makes redelivery a no-op (unlike the single-instance publisher, which reads a DB table). `inbox_messages`
+and published `outbox_messages` are trimmed past a retention window by a scheduled `messaging:prune` so the
+bookkeeping tables don't grow forever; `failed` outbox rows and the audit log are kept.
 
 Routing keys:
 
@@ -199,8 +227,8 @@ The monolith is organised as bounded contexts under `app/Domain/<Context>` (toda
 `Users`). The rules that keep them splittable later:
 
 - Cross-context side effects go through **domain events** + **contracts (interfaces)**, never direct
-  calls into another context's internals. `SendDocumentAction → DocumentSent → SigningInvitationNotifier`
-  is the first example; notifications and audit will attach the same way.
+  calls into another context's internals. The notifications and audit consumers attach to the same
+  versioned events behind `EventConsumer`/`AuditStore`/`SigningInvitationNotifier` contracts.
 - Anything crossing a process boundary is described by a **versioned contract** in
   `contracts/events/v1` (payload shapes, routing keys with a `.vN` suffix), not by serialized models.
 - Infrastructure (mail, queue, storage) lives in `app/Infrastructure` behind domain contracts, so an

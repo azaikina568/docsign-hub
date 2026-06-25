@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Documents\Consumers\NotificationsConsumer;
+use App\Domain\Messaging\Consumers\AuditConsumer;
+
 return [
     /*
      * Подключение к RabbitMQ. Таймауты заданы намеренно — чтобы воркер-публишер не висел
@@ -49,4 +52,31 @@ return [
         'backoff_max_seconds' => (int) env('OUTBOX_BACKOFF_MAX', 300),
         'idle_sleep_seconds' => (int) env('OUTBOX_IDLE_SLEEP', 1),
     ],
+
+    /*
+     * Реестр consumer'ов: имя → класс (команда `messaging:consume {name}`). Каждый читает свою очередь
+     * и дедуплицирует по event_id (inbox). Имя — ключ идемпотентности.
+     */
+    'consumers' => [
+        'notifications' => NotificationsConsumer::class,
+        'audit' => AuditConsumer::class,
+    ],
+
+    /*
+     * Audit-журнал доменных событий в MongoDB (append-only). URI/база берутся из общего .env,
+     * коллекция — неизменяемый поток событий.
+     */
+    'audit' => [
+        'uri' => env('MONGODB_URI', 'mongodb://mongodb:27017'),
+        'database' => env('MONGODB_DATABASE', 'docsign_hub'),
+        'collection' => env('MONGODB_AUDIT_COLLECTION', 'audit_events'),
+    ],
+
+    /*
+     * Срок хранения служебных строк обмена (дни): опубликованные outbox-строки и обработанные inbox-строки
+     * старше окна чистит `messaging:prune` — иначе таблицы растут без предела. Окно с запасом больше любого
+     * мыслимого времени переотправки брокером, так что повторная доставка после чистки невозможна.
+     * audit-журнал (Mongo) и `failed`-строки outbox не трогаем — это намеренно долгоживущие данные.
+     */
+    'retention_days' => (int) env('MESSAGING_RETENTION_DAYS', 7),
 ];

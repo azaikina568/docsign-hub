@@ -6,7 +6,6 @@ use App\Domain\Documents\Enums\DocumentStatus;
 use App\Domain\Documents\Enums\PartyRole;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Models\DocumentParty;
-use App\Domain\Documents\Notifications\SigningInvitationNotification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -17,7 +16,7 @@ class DocumentWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_send_moves_to_pending_and_invites_signers_without_leaking_tokens(): void
+    public function test_send_moves_to_pending_and_records_event_without_leaking_tokens(): void
     {
         Notification::fake();
 
@@ -45,11 +44,13 @@ class DocumentWorkflowTest extends TestCase
         $this->assertNotNull($token->expires_at);
         $this->assertSame(64, strlen($token->token_hash));
 
-        // Приглашение уходит подписанту на его email, а не отправителю.
-        Notification::assertSentOnDemand(
-            SigningInvitationNotification::class,
-            fn ($notification, $channels, $notifiable) => $notifiable->routes['mail'] === 'signer@example.com',
-        );
+        // Отправка фиксирует событие document.sent (на нём consumer строит рассылку приглашений),
+        // но синхронно письмо не уходит — доставка вынесена за очередь (Этап 5c).
+        $this->assertDatabaseHas('outbox_messages', [
+            'event_type' => 'document.sent',
+            'aggregate_id' => $document->ulid,
+        ]);
+        Notification::assertNothingSent();
     }
 
     public function test_send_sets_document_deadline_matching_token_expiry(): void

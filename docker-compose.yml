@@ -66,6 +66,42 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  # Consumer уведомлений: события RabbitMQ → письма (приглашения по очереди, уведомление об истечении).
+  consumer-notifications:
+    build:
+      context: ./infra/docker/php
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/var/www/html
+    command: sh -c "until [ -f vendor/autoload.php ]; do sleep 2; done; php artisan messaging:consume notifications"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # Audit-consumer: события RabbitMQ → неизменяемый журнал в MongoDB (audit_events).
+  consumer-audit:
+    build:
+      context: ./infra/docker/php
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/var/www/html
+    command: sh -c "until [ -f vendor/autoload.php ]; do sleep 2; done; php artisan messaging:consume audit"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+
   nginx:
     image: nginx:1.27-alpine
     ports:

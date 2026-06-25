@@ -9,13 +9,14 @@ DocSign Hub — демонстрационный сервис электронн
 ## Статус
 
 Бэкенд закрывает основной поток подписания: аутентификация (с верификацией email), документы и строго
-последовательное подписание по модели «capability или identity». Frontend пока — каркас с проверкой API.
-События в RabbitMQ, audit в MongoDB и полноценный UI — следующие шаги (см. [Roadmap](#roadmap)).
+последовательное подписание по модели «capability или identity». Доменные события идут через transactional
+outbox в RabbitMQ, а consumer'ы рассылают приглашения по очереди и пишут audit в MongoDB. Frontend пока —
+каркас с проверкой API; полноценный UI — следующий шаг (см. [Roadmap](#roadmap)).
 
 ## Стек
 
 - **Backend:** PHP 8.4, Laravel 12, PostgreSQL, Redis (rate-limit/cache/locks),
-  RabbitMQ (события, планируется), MongoDB (audit, планируется), Mailpit (почта в dev).
+  RabbitMQ (доменные события через outbox), MongoDB (audit-журнал), Mailpit (почта в dev).
 - **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS, TanStack Query, Pinia, shadcn-vue-ready структура.
 - **Инфраструктура/инструменты:** Docker Compose (+ отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint,
   PHPStan/Larastan, OpenAPI/Swagger (Scramble).
@@ -47,11 +48,17 @@ DocSign Hub — демонстрационный сервис электронн
 - Переходы `pending → partially_signed → signed`; фиксируются `signature_hash`, ip/user-agent и снимок
   содержимого (`content_hash`). Приглашения уходят подписантам на email (в dev — Mailpit); отправителю
   токены не возвращаются.
+- **Поэтапная рассылка**: при отправке приглашение получает только первый по очереди; следующего зовёт
+  consumer уведомлений после подписи предыдущего. Токен перевыпускается при доставке — emailed-ссылка
+  всегда свежая и одноразовая, в БД лежит только хеш.
 
 **События (messaging)**
 - Доменные события (`document.created/sent/signed/completed/cancelled/expired`) пишутся в transactional
   outbox в одной транзакции с бизнес-данными и публикуются worker'ом в RabbitMQ (`docsign.events`) с
   ретраями/backoff. Форма каждого события зафиксирована JSON Schema (`contracts/events/v1`).
+- Два consumer'а читают события: **уведомления** (приглашения по очереди, письмо владельцу об истечении) и
+  **audit** (неизменяемый журнал в MongoDB, `audit_events`). At-least-once + дедуп по `event_id` (inbox);
+  отвергнутые сообщения уходят в dead-letter (`docsign.dlq`).
 
 **Прочее**
 - `GET /api/v1/health`, интерактивная API-документация на `/docs/api` (генерируется из кода), отрисованные
@@ -62,9 +69,8 @@ DocSign Hub — демонстрационный сервис электронн
 
 | Дальше | Что |
 | --- | --- |
-| RabbitMQ + outbox + audit | доменные события через transactional outbox → RabbitMQ; audit в MongoDB; уведомления |
-| Frontend | дашборд документов, public sign page, viewer read-only, состояния loading/empty/error |
-| CI, docs, cleanup | GitHub Actions (+ GitLab CI), финальная документация |
+| Frontend | дашборд документов, public sign page, viewer read-only, индикатор очереди, состояния loading/empty/error |
+| CI, docs, cleanup | GitHub Actions (+ GitLab CI), каталог событий (AsyncAPI), финальная документация |
 
 Будущие треки (поиск/Elasticsearch, observability, k8s, микросервисы/gRPC) — за рамками MVP.
 
@@ -150,20 +156,23 @@ PostgreSQL — источник истины (пользователи, доку
 (rate-limit, cache, short-lived locks). Доменные события идут через **transactional outbox**: действие в своей
 транзакции пишет бизнес-данные и строку в `outbox_messages` (атомарно, без потерь), а отдельный worker-publisher
 (`outbox:publish`) шлёт их в topic-exchange `docsign.events` с ретраями/backoff. Форма каждого события
-зафиксирована JSON Schema (`contracts/events/v1`). Consumers (уведомления, audit в MongoDB) — следующий шаг.
-Это задел под микросервисы: кросс-контекстные эффекты идут через версионированные контракты событий,
-поэтому notifications/audit позже можно вынести в отдельные сервисы, не трогая ядро.
+зафиксирована JSON Schema (`contracts/events/v1`). Два consumer'а (`messaging:consume notifications|audit`)
+читают события: уведомления рассылают приглашения по очереди и пишут владельцу об истечении, audit складывает
+неизменяемый журнал в MongoDB. Доставка at-least-once, идемпотентность — inbox по `event_id`; необрабатываемые
+сообщения уходят в dead-letter. Это задел под микросервисы: кросс-контекстные эффекты идут через
+версионированные контракты событий, поэтому notifications/audit позже можно вынести в отдельные сервисы,
+не трогая ядро.
 
 Подробнее — [docs/architecture.md](docs/architecture.md); диаграммы (ERD, машина состояний, sequence
-отправки/подписания, deployment, messaging) — [docs/diagrams.md](docs/diagrams.md) (рендерятся на GitHub и на
-`/docs/diagrams`).
+отправки/подписания/рассылки, deployment, messaging) — [docs/diagrams.md](docs/diagrams.md) (рендерятся на
+GitHub и на `/docs/diagrams`).
 
 ## Структура репозитория
 
 ```
 backend/    Laravel 12 API (app/Domain, app/Http, config, database, tests)
 frontend/   Vue 3 + TS + Vite (каркас)
-contracts/  версионированные контракты событий для RabbitMQ (задел под Этап 5)
+contracts/  версионированные контракты событий (JSON Schema) для RabbitMQ
 docs/       architecture.md, diagrams.md
 infra/      Docker-обвязка (nginx, php Dockerfile)
 docker-compose.yml, Makefile, .env.example
@@ -194,7 +203,9 @@ npm run build
 ## Осознанные ограничения
 
 - Это demo, не юридически значимая система ЭЦП; подпись демонстрационная.
-- События в RabbitMQ (outbox publisher) и audit writer в MongoDB ещё не подключены — добавляются следующим шагом.
-- Приглашения на подписание уходят в Mailpit (локально); наружу реальная почта/SMS не отправляются.
+- Приглашения и уведомления уходят в Mailpit (локально); наружу реальная почта/SMS не отправляются.
+- Publisher и consumer'ы — по одному инстансу (без конкурентного вычитывания); горизонтальное
+  масштабирование (`FOR UPDATE SKIP LOCKED`, несколько воркеров) описано, но намеренно не включено.
+- Audit-журнал в MongoDB пишется append-only; UI/поиск по нему — будущий трек.
 - Frontend — каркас (экран health-check); полноценный UI — отдельный этап.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.

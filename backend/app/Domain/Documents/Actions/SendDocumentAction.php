@@ -2,10 +2,8 @@
 
 namespace App\Domain\Documents\Actions;
 
-use App\Domain\Documents\Data\SigningInvitation;
 use App\Domain\Documents\Enums\DocumentStatus;
 use App\Domain\Documents\Enums\PartyRole;
-use App\Domain\Documents\Events\DocumentSent;
 use App\Domain\Documents\Exceptions\DocumentStateException;
 use App\Domain\Documents\Models\Document;
 use App\Domain\Documents\Models\SignatureToken;
@@ -25,8 +23,9 @@ class SendDocumentAction
     ) {}
 
     /**
-     * Переводит документ из draft в pending, выдаёт signing-токены подписантам
-     * и публикует событие DocumentSent (приглашения уходят участникам, не отправителю).
+     * Переводит документ из draft в pending и выдаёт signing-токены подписантам.
+     * Приглашения рассылаются не здесь, а consumer'ом уведомлений по событию document.sent —
+     * причём только первому по очереди (поэтапная рассылка, OPEN_QUESTIONS Q3).
      */
     public function execute(Document $document, User $actor): Document
     {
@@ -47,24 +46,20 @@ class SendDocumentAction
         // никогда не закроет заброшенный документ (фильтр по expires_at).
         $deadline = $document->expires_at ?? now()->addDays((int) config('docsign.signing_token_ttl_days'));
 
-        $invitations = DB::transaction(function () use ($document, $actor, $signers, $deadline) {
+        DB::transaction(function () use ($document, $actor, $signers, $deadline): void {
             $document->expires_at = $deadline;
             // Снимок подписываемого: подписи привязываются к нему через content_hash,
             // поэтому позднейшее изменение содержимого детектируется (см. SIGNING_SECURITY.md).
             $document->content_hash = $this->contentHash($document);
 
-            $invitations = [];
-
+            // Токены создаём всем подписантам сразу; откладывается только доставка письма
+            // (consumer перевыпустит токен текущему по очереди при рассылке приглашения).
             foreach ($signers as $party) {
-                $plain = Str::random(40);
-
                 SignatureToken::create([
                     'document_party_id' => $party->id,
-                    'token_hash' => hash('sha256', $plain),
+                    'token_hash' => hash('sha256', Str::random(40)),
                     'expires_at' => $deadline,
                 ]);
-
-                $invitations[] = new SigningInvitation($party, $plain);
             }
 
             // transition() сохраняет документ целиком — вместе с проставленным expires_at.
@@ -76,12 +71,7 @@ class SendDocumentAction
                 'signers' => $signers->count(),
                 'expires_at' => $document->expires_at?->toISOString(),
             ]));
-
-            return $invitations;
         });
-
-        // Приглашения рассылаем после коммита: сбой доставки не должен откатывать отправку.
-        DocumentSent::dispatch($document, $invitations);
 
         return $document;
     }
