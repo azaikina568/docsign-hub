@@ -26,7 +26,7 @@ DocSign Hub — демонстрационный сервис электронн
 - **Backend:** PHP 8.4, Laravel 12, PostgreSQL, Redis (rate-limit/cache/locks),
   RabbitMQ (доменные события через outbox), MongoDB (audit-журнал), Mailpit (почта в dev).
 - **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (компоненты вручную), TanStack Query, Pinia, zod;
-  Vitest + Vue Test Utils + MSW, ESLint + Prettier.
+  Vitest + Vue Test Utils + MSW, Playwright (e2e), ESLint + Prettier.
 - **Инфраструктура/инструменты:** Docker Compose (+ отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint,
   PHPStan/Larastan, OpenAPI/Swagger (Scramble).
 
@@ -84,13 +84,14 @@ DocSign Hub — демонстрационный сервис электронн
   (401/403/404/409/410/422/429/5xx → понятный текст, без «голых» 500), клиентская валидация форм (zod) с подсказкой
   требований к паролю, «дублировать» терминальный документ в новый draft, mobile-first адаптив.
 - Frontend-тесты и стандарты: Vitest + Vue Test Utils + MSW (юнит/компонентные/интеграционные — валидация, нормализация
-  ошибок, тосты, формат, прозрачный refresh клиента); ESLint (vue/ts) + Prettier (`npm run lint` / `format:check`).
+  ошибок, тосты, формат, стор, прозрачный refresh клиента), Playwright e2e сквозного сценария подписания против живого
+  стека; ESLint (vue/ts) + Prettier (`npm run lint` / `format:check`).
 
 ## Roadmap
 
 | Дальше | Что |
 | --- | --- |
-| Frontend e2e + i18n | Playwright (основной сценарий с асинхронными приглашениями), vue-i18n |
+| Frontend i18n | vue-i18n (словари en+ru, формат дат/чисел по локали) |
 | CI, docs, cleanup | GitHub Actions (+ GitLab CI), каталог событий (AsyncAPI), финальная документация |
 
 Будущие треки (поиск/Elasticsearch, observability, k8s, микросервисы/gRPC) — за рамками MVP.
@@ -224,6 +225,17 @@ npm run test:run      # Vitest (юнит/компонентные/MSW)
 npm run build
 ```
 
+End-to-end (Playwright, против поднятого стека `make up`):
+
+```bash
+npx playwright install chromium   # один раз
+npm run e2e                        # сквозной сценарий подписания + смоук гарда
+```
+
+`npm run e2e` сам поднимает фронт (Vite) и гоняет браузер против API/Mailpit из Docker; основной тест проходит
+весь путь: регистрация → верификация email из письма → черновик → участники → отправка → поэтапная подпись
+(приглашения приходят по очереди через consumer) → документ подписан.
+
 ## Осознанные ограничения
 
 - Это demo, не юридически значимая система ЭЦП; подпись демонстрационная.
@@ -231,5 +243,5 @@ npm run build
 - Publisher и consumer'ы — по одному инстансу (без конкурентного вычитывания); горизонтальное
   масштабирование (`FOR UPDATE SKIP LOCKED`, несколько воркеров) описано, но намеренно не включено.
 - Audit-журнал в MongoDB пишется append-only; UI/поиск по нему — будущий трек.
-- Frontend покрыт юнит/компонентными тестами (Vitest + MSW); сквозной e2e (Playwright) и i18n — следующий шаг.
+- Frontend покрыт юнит/компонентными тестами (Vitest + MSW) и сквозным e2e (Playwright) основного сценария; локализация (i18n) — следующий шаг.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.

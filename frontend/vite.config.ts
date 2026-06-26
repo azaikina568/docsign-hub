@@ -13,6 +13,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
+    // Только юнит/компонентные specs из src; e2e (./e2e) гоняет Playwright, не Vitest.
+    include: ['src/**/*.spec.ts'],
     // CSS не нужен в jsdom-тестах: Tailwind-классы проверяем по имени, не по вычисленному стилю.
     css: false,
     coverage: {

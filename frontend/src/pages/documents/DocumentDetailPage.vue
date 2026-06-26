@@ -120,7 +120,7 @@ async function onDuplicate(): Promise<void> {
             <span v-if="document.completed_at"> · completed {{ formatDateTime(document.completed_at) }}</span>
           </p>
         </div>
-        <StatusBadge :status="document.status" />
+        <StatusBadge :status="document.status" data-testid="doc-status" />
       </div>
 
       <!-- Действия зависят от стадии: draft — состав и отправка; открытый — отмена/продление; терминальный — дублирование. -->

@@ -174,9 +174,12 @@ zod schemas that mirror the server rules (the server stays authoritative — its
 
 **Testing.** Vitest + Vue Test Utils + MSW on happy-dom: unit (validation, error normalization,
 toasts, formatting), components (FormField, ToastHost), the auth store, query composables (the
-duplicate flow), and the client's transparent-refresh integration. ESLint (vue + typescript-eslint,
-formatting delegated to Prettier) and Prettier enforce one style; `tsconfig.vitest.json` type-checks
-tests apart from the production build.
+duplicate flow), and the client's transparent-refresh integration. A Playwright e2e (`frontend/e2e`)
+drives the full scenario against the live stack — registration, email verification from the Mailpit
+inbox, document creation, staged signing-invitation delivery via the consumer, and capability
+signing through to a fully signed document. ESLint (vue + typescript-eslint, formatting delegated to
+Prettier) and Prettier enforce one style; `tsconfig.vitest.json` type-checks tests apart from the
+production build.
 
 ## API documentation
 

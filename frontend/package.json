@@ -11,10 +11,12 @@
     "test": "vitest",
     "test:run": "vitest run",
     "coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write src tests",
-    "format:check": "prettier --check src tests"
+    "format": "prettier --write src tests e2e",
+    "format:check": "prettier --check src tests e2e"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
@@ -28,6 +30,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^24.12.3",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vitest/coverage-v8": "^4.1.9",
