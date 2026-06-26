@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { toRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useEventsQuery } from '@/features/documents/queries'
 import { statusLabel } from '@/shared/format'
 import { formatDateTime } from '@/shared/format'
 
+const { t } = useI18n()
 const props = defineProps<{ documentId: string }>()
 
 const { data, isPending, isError } = useEventsQuery(toRef(props, 'documentId'))
@@ -11,8 +13,8 @@ const { data, isPending, isError } = useEventsQuery(toRef(props, 'documentId'))
 
 <template>
   <div>
-    <p v-if="isPending" class="text-sm text-slate-400">Loading history…</p>
-    <p v-else-if="isError" class="text-sm text-red-600">Could not load history.</p>
+    <p v-if="isPending" class="text-sm text-slate-400">{{ t('timeline.loading') }}</p>
+    <p v-else-if="isError" class="text-sm text-red-600">{{ t('timeline.loadError') }}</p>
 
     <ol v-else-if="data" class="relative ml-1.5 border-l border-slate-200">
       <li v-for="entry in data.data" :key="entry.id" class="ml-4 py-2">

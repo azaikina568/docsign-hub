@@ -1,5 +1,6 @@
 import { AxiosError } from 'axios'
 import type { ApiErrorBody } from './types'
+import { t } from '@/shared/i18n'
 
 export interface NormalizedError {
   message: string
@@ -9,14 +10,15 @@ export interface NormalizedError {
   fields: Record<string, string>
 }
 
-// Фолбэк-тексты по кодам, когда сообщение бэка либо техническое, либо неинформативно для пользователя.
-const codeMessages: Record<number, string> = {
-  401: 'Your session has expired. Please sign in again.',
-  403: 'You do not have permission to do that.',
-  404: 'We could not find what you were looking for.',
-  409: 'This action conflicts with the document’s current state. Refresh and try again.',
-  410: 'This link is no longer valid — it may have expired.',
-  429: 'Too many requests. Please wait a moment and try again.',
+// Фолбэк-ключи по кодам, когда сообщение бэка либо техническое, либо неинформативно для пользователя.
+// Текст резолвится из словаря в момент вызова — под активную локаль.
+const codeKeys: Record<number, string> = {
+  401: 'errors.session',
+  403: 'errors.forbidden',
+  404: 'errors.notFound',
+  409: 'errors.conflict',
+  410: 'errors.gone',
+  429: 'errors.tooMany',
 }
 
 // Приводит любую ошибку axios к удобному виду: текст по коду + ошибки по полям (для форм).
@@ -35,19 +37,19 @@ export function normalizeError(error: unknown): NormalizedError {
     return { message: messageFor(status, body), status, fields }
   }
 
-  return { message: 'Network error. Check your connection and try again.', status: null, fields: {} }
+  return { message: t('errors.network'), status: null, fields: {} }
 }
 
 function messageFor(status: number, body: ApiErrorBody): string {
   // 5xx нельзя показывать как есть (может быть «Server Error»/трейс) — даём нейтральный текст.
   if (status >= 500) {
-    return 'Something went wrong on our side. Please try again in a moment.'
+    return t('errors.server')
   }
 
   // На 401/429 текст сервера не несёт пользе пользователю — всегда свой; на доменных 4xx — сообщение бэка.
   if (status === 401 || status === 429) {
-    return codeMessages[status]
+    return t(codeKeys[status])
   }
 
-  return body.message?.trim() || codeMessages[status] || 'Request failed. Please try again.'
+  return body.message?.trim() || (codeKeys[status] ? t(codeKeys[status]) : t('errors.generic'))
 }

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { CheckCircle2, Info, X, XCircle } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import { useToasts, type ToastVariant } from '@/shared/toast'
 
+const { t } = useI18n()
 const { toasts, dismiss } = useToasts()
 
 const styles: Record<ToastVariant, string> = {
@@ -22,19 +24,19 @@ const icons = { success: CheckCircle2, error: XCircle, info: Info }
       leave-to-class="opacity-0"
     >
       <div
-        v-for="t in toasts"
-        :key="t.id"
+        v-for="toastItem in toasts"
+        :key="toastItem.id"
         class="pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-lg border px-4 py-3 text-sm shadow-sm"
-        :class="styles[t.variant]"
-        :role="t.variant === 'error' ? 'alert' : 'status'"
+        :class="styles[toastItem.variant]"
+        :role="toastItem.variant === 'error' ? 'alert' : 'status'"
         aria-live="polite"
       >
-        <component :is="icons[t.variant]" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <span class="min-w-0 flex-1">{{ t.message }}</span>
+        <component :is="icons[toastItem.variant]" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span class="min-w-0 flex-1">{{ toastItem.message }}</span>
         <button
           class="shrink-0 rounded p-0.5 opacity-60 transition hover:opacity-100"
-          aria-label="Dismiss"
-          @click="dismiss(t.id)"
+          :aria-label="t('toast.dismiss')"
+          @click="dismiss(toastItem.id)"
         >
           <X class="size-4" aria-hidden="true" />
         </button>

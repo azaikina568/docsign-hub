@@ -4,6 +4,7 @@ import * as authApi from '@/shared/api/auth'
 import type { LoginPayload, RegisterPayload } from '@/shared/api/auth'
 import { setAuthExpiredHandler } from '@/shared/api/client'
 import { toast } from '@/shared/toast'
+import { t } from '@/shared/i18n'
 import { clearTokens, getAccessToken, setTokens } from '@/shared/api/tokens'
 import type { AuthResponse, User } from '@/shared/api/types'
 import router from '@/router'
@@ -53,7 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     setAuthExpiredHandler(() => {
       reset()
-      toast.info('Your session has expired. Please sign in again.')
+      toast.info(t('errors.session'))
       void router.push({ name: 'login' })
     })
 

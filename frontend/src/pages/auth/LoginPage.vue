@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeError } from '@/shared/api/errors'
 import { loginSchema, validate } from '@/shared/validation'
 import FormField from '@/components/FormField.vue'
 import AppButton from '@/components/AppButton.vue'
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 
+const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
@@ -43,10 +46,13 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+  <div class="relative flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div class="absolute right-4 top-4">
+      <LanguageSwitcher />
+    </div>
     <div class="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 class="text-lg font-semibold text-slate-900">Sign in</h1>
-      <p class="mt-1 text-sm text-slate-500">Welcome back to DocSign Hub.</p>
+      <h1 class="text-lg font-semibold text-slate-900">{{ t('login.title') }}</h1>
+      <p class="mt-1 text-sm text-slate-500">{{ t('login.subtitle') }}</p>
 
       <form class="mt-5 flex flex-col gap-4" novalidate @submit.prevent="onSubmit">
         <p v-if="generalError" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ generalError }}</p>
@@ -54,7 +60,7 @@ async function onSubmit(): Promise<void> {
         <FormField
           id="email"
           v-model="form.email"
-          label="Email"
+          :label="t('login.email')"
           type="email"
           autocomplete="email"
           :error="errors.email"
@@ -62,20 +68,20 @@ async function onSubmit(): Promise<void> {
         <FormField
           id="password"
           v-model="form.password"
-          label="Password"
+          :label="t('login.password')"
           type="password"
           autocomplete="current-password"
           :error="errors.password"
         />
 
-        <AppButton type="submit" :loading="loading">Sign in</AppButton>
+        <AppButton type="submit" :loading="loading">{{ t('login.title') }}</AppButton>
       </form>
 
       <p class="mt-4 text-center text-sm text-slate-500">
-        No account?
-        <RouterLink :to="{ name: 'register' }" class="font-medium text-slate-900 hover:underline"
-          >Create one</RouterLink
-        >
+        {{ t('login.noAccount') }}
+        <RouterLink :to="{ name: 'register' }" class="font-medium text-slate-900 hover:underline">{{
+          t('login.createOne')
+        }}</RouterLink>
       </p>
     </div>
   </div>

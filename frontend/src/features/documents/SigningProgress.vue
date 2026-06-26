@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { DocumentParty } from '@/shared/api/documents'
 
+const { t } = useI18n()
 const props = defineProps<{ parties: DocumentParty[]; status: string }>()
 
 // Индикатор очереди подписания (OPEN_QUESTIONS Q3): сколько подписали и чья очередь сейчас.
@@ -19,8 +21,8 @@ const current = computed(() => (isOpen.value ? (signers.value.find((p) => p.stat
 <template>
   <div v-if="total > 0" class="rounded-lg border border-slate-200 bg-white p-4">
     <div class="flex items-center justify-between text-sm">
-      <span class="font-medium text-slate-700">Signing progress</span>
-      <span class="text-slate-500">{{ signed }} of {{ total }} signed</span>
+      <span class="font-medium text-slate-700">{{ t('signingProgress.heading') }}</span>
+      <span class="text-slate-500">{{ t('signingProgress.signedOf', { signed, total }) }}</span>
     </div>
 
     <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
@@ -28,10 +30,10 @@ const current = computed(() => (isOpen.value ? (signers.value.find((p) => p.stat
     </div>
 
     <p v-if="current" class="mt-3 text-sm text-slate-500">
-      Waiting on
+      {{ t('signingProgress.waitingOn') }}
       <span class="font-medium text-slate-700">{{ current.name }}</span>
       <span class="text-slate-400">(#{{ current.signing_order }})</span>
     </p>
-    <p v-else-if="status === 'signed'" class="mt-3 text-sm text-green-600">All signers have signed.</p>
+    <p v-else-if="status === 'signed'" class="mt-3 text-sm text-green-600">{{ t('signingProgress.allSigned') }}</p>
   </div>
 </template>

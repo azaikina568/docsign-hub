@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useRemoveParty } from '@/features/documents/queries'
 import type { DocumentParty } from '@/shared/api/documents'
 
+const { t } = useI18n()
 const props = defineProps<{ documentId: string; parties: DocumentParty[]; canManage: boolean }>()
 
 const removeParty = useRemoveParty(props.documentId)
@@ -20,12 +22,12 @@ const removeParty = useRemoveParty(props.documentId)
         <p class="truncate text-xs text-slate-400">{{ party.email }}</p>
       </div>
       <div class="flex shrink-0 items-center gap-3">
-        <span class="text-xs capitalize text-slate-500">{{ party.role }}</span>
+        <span class="text-xs text-slate-500">{{ t(`party.role.${party.role}`) }}</span>
         <span
           class="rounded-full px-2 py-0.5 text-xs font-medium"
           :class="party.status === 'signed' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'"
         >
-          {{ party.status === 'signed' ? 'Signed' : 'Pending' }}
+          {{ party.status === 'signed' ? t('party.status.signed') : t('party.status.pending') }}
         </span>
         <button
           v-if="canManage"
@@ -33,12 +35,12 @@ const removeParty = useRemoveParty(props.documentId)
           :disabled="removeParty.isPending.value"
           @click="removeParty.mutate(party.id)"
         >
-          Remove
+          {{ t('partyList.remove') }}
         </button>
       </div>
     </li>
   </ul>
   <p v-else class="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-400">
-    No parties yet.
+    {{ t('partyList.empty') }}
   </p>
 </template>

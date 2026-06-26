@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   useCancelDocument,
   useDeleteDocument,
@@ -20,6 +21,7 @@ import PartyList from '@/features/documents/PartyList.vue'
 import AddPartyForm from '@/features/documents/AddPartyForm.vue'
 import DocumentTimeline from '@/features/documents/DocumentTimeline.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 // RouterView пересоздаёт страницу по route.path (см. App.vue), поэтому id стабилен на время жизни компонента.
@@ -60,14 +62,14 @@ async function run(fn: () => Promise<unknown>, successMessage: string): Promise<
 
 async function onSend(): Promise<void> {
   if (!hasSigner.value) {
-    toast.error('Add at least one signer before sending.')
+    toast.error(t('documentDetail.toastNeedSigner'))
     return
   }
-  await run(() => sendDoc.mutateAsync(undefined), 'Document sent for signing.')
+  await run(() => sendDoc.mutateAsync(undefined), t('documentDetail.toastSent'))
 }
 
 async function onCancel(): Promise<void> {
-  await run(() => cancelDoc.mutateAsync(cancelReason.value || undefined), 'Document cancelled.')
+  await run(() => cancelDoc.mutateAsync(cancelReason.value || undefined), t('documentDetail.toastCancelled'))
   cancelOpen.value = false
 }
 
@@ -75,7 +77,10 @@ async function onExtend(): Promise<void> {
   if (!newDeadline.value) {
     return
   }
-  await run(() => extendDoc.mutateAsync(new Date(newDeadline.value).toISOString()), 'Deadline moved.')
+  await run(
+    () => extendDoc.mutateAsync(new Date(newDeadline.value).toISOString()),
+    t('documentDetail.toastDeadlineMoved'),
+  )
   extendOpen.value = false
 }
 
@@ -83,7 +88,7 @@ async function onDelete(): Promise<void> {
   await run(async () => {
     await deleteDoc.mutateAsync()
     await router.push({ name: 'dashboard' })
-  }, 'Draft deleted.')
+  }, t('documentDetail.toastDeleted'))
 }
 
 async function onDuplicate(): Promise<void> {
@@ -92,7 +97,7 @@ async function onDuplicate(): Promise<void> {
   }
   try {
     const draft = await duplicateDoc.mutateAsync(document.value)
-    toast.success('Created a new draft from this document.')
+    toast.success(t('documentDetail.toastDuplicated'))
     await router.push({ name: 'document-detail', params: { id: draft.id } })
   } catch (error) {
     toast.error(normalizeError(error).message)
@@ -102,13 +107,13 @@ async function onDuplicate(): Promise<void> {
 
 <template>
   <AppLayout>
-    <RouterLink :to="{ name: 'dashboard' }" class="text-sm text-slate-500 hover:underline"
-      >← Back to documents</RouterLink
-    >
+    <RouterLink :to="{ name: 'dashboard' }" class="text-sm text-slate-500 hover:underline">{{
+      t('common.backToDocuments')
+    }}</RouterLink>
 
-    <div v-if="isPending" class="mt-8 text-center text-sm text-slate-400">Loading document…</div>
+    <div v-if="isPending" class="mt-8 text-center text-sm text-slate-400">{{ t('documentDetail.loading') }}</div>
     <div v-else-if="isError || !document" class="mt-8 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-      Could not load this document.
+      {{ t('documentDetail.loadError') }}
     </div>
 
     <template v-else>
@@ -116,8 +121,10 @@ async function onDuplicate(): Promise<void> {
         <div>
           <h1 class="text-xl font-semibold text-slate-900">{{ document.title }}</h1>
           <p class="mt-1 text-sm text-slate-400">
-            Deadline: {{ formatDateTime(document.expires_at) }}
-            <span v-if="document.completed_at"> · completed {{ formatDateTime(document.completed_at) }}</span>
+            {{ t('documentDetail.deadline', { date: formatDateTime(document.expires_at) }) }}
+            <span v-if="document.completed_at">
+              {{ t('documentDetail.completed', { date: formatDateTime(document.completed_at) }) }}</span
+            >
           </p>
         </div>
         <StatusBadge :status="document.status" data-testid="doc-status" />
@@ -125,44 +132,56 @@ async function onDuplicate(): Promise<void> {
 
       <!-- Действия зависят от стадии: draft — состав и отправка; открытый — отмена/продление; терминальный — дублирование. -->
       <div class="mt-4 flex flex-wrap gap-2">
-        <AppButton v-if="isDraft" :loading="sendDoc.isPending.value" @click="onSend">Send for signing</AppButton>
-        <AppButton v-if="isDraft" variant="ghost" @click="onDelete">Delete draft</AppButton>
-        <AppButton v-if="isOpen" variant="ghost" @click="cancelOpen = !cancelOpen">Cancel</AppButton>
-        <AppButton v-if="isOpen" variant="ghost" @click="extendOpen = !extendOpen">Extend deadline</AppButton>
+        <AppButton v-if="isDraft" :loading="sendDoc.isPending.value" @click="onSend">{{
+          t('documentDetail.send')
+        }}</AppButton>
+        <AppButton v-if="isDraft" variant="ghost" @click="onDelete">{{ t('documentDetail.deleteDraft') }}</AppButton>
+        <AppButton v-if="isOpen" variant="ghost" @click="cancelOpen = !cancelOpen">{{
+          t('documentDetail.cancel')
+        }}</AppButton>
+        <AppButton v-if="isOpen" variant="ghost" @click="extendOpen = !extendOpen">{{
+          t('documentDetail.extendDeadline')
+        }}</AppButton>
         <AppButton v-if="isTerminal" :loading="duplicateDoc.isPending.value" @click="onDuplicate">
-          Duplicate
+          {{ t('documentDetail.duplicate') }}
         </AppButton>
       </div>
-      <p v-if="isTerminal" class="mt-2 text-xs text-slate-400">
-        This document is finalised and can’t be changed. Duplicate it to start a new draft with the same parties.
-      </p>
+      <p v-if="isTerminal" class="mt-2 text-xs text-slate-400">{{ t('documentDetail.finalised') }}</p>
 
       <div
         v-if="cancelOpen"
         class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md"
       >
-        <label for="cancel-reason" class="text-sm font-medium text-slate-700">Reason (optional)</label>
+        <label for="cancel-reason" class="text-sm font-medium text-slate-700">{{
+          t('documentDetail.cancelReason')
+        }}</label>
         <textarea
           id="cancel-reason"
           v-model="cancelReason"
           rows="2"
           class="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
         />
-        <AppButton :loading="cancelDoc.isPending.value" @click="onCancel">Confirm cancellation</AppButton>
+        <AppButton :loading="cancelDoc.isPending.value" @click="onCancel">{{
+          t('documentDetail.confirmCancel')
+        }}</AppButton>
       </div>
 
       <div
         v-if="extendOpen"
         class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md"
       >
-        <label for="new-deadline" class="text-sm font-medium text-slate-700">New deadline</label>
+        <label for="new-deadline" class="text-sm font-medium text-slate-700">{{
+          t('documentDetail.newDeadline')
+        }}</label>
         <input
           id="new-deadline"
           v-model="newDeadline"
           type="datetime-local"
           class="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
         />
-        <AppButton :loading="extendDoc.isPending.value" @click="onExtend">Move deadline</AppButton>
+        <AppButton :loading="extendDoc.isPending.value" @click="onExtend">{{
+          t('documentDetail.moveDeadline')
+        }}</AppButton>
       </div>
 
       <div class="mt-6 grid gap-6 lg:grid-cols-3">
@@ -170,7 +189,7 @@ async function onDuplicate(): Promise<void> {
           <SigningProgress :parties="document.parties" :status="document.status" />
 
           <section>
-            <h2 class="mb-2 text-sm font-semibold text-slate-700">Parties</h2>
+            <h2 class="mb-2 text-sm font-semibold text-slate-700">{{ t('documentDetail.partiesHeading') }}</h2>
             <PartyList :document-id="id" :parties="document.parties" :can-manage="isDraft" />
             <div v-if="isDraft" class="mt-3">
               <AddPartyForm :document-id="id" />
@@ -179,7 +198,7 @@ async function onDuplicate(): Promise<void> {
         </div>
 
         <section>
-          <h2 class="mb-2 text-sm font-semibold text-slate-700">History</h2>
+          <h2 class="mb-2 text-sm font-semibold text-slate-700">{{ t('documentDetail.historyHeading') }}</h2>
           <DocumentTimeline :document-id="id" />
         </section>
       </div>

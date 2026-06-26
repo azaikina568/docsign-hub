@@ -2,13 +2,14 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ToastHost from './ToastHost.vue'
 import { toast, useToasts } from '@/shared/toast'
+import { i18n } from '@/shared/i18n'
 
 const { toasts } = useToasts()
 
 // TransitionGroup стабаем плоским контейнером: в jsdom анимации нет, нужен детерминированный рендер списка.
 function render() {
   return mount(ToastHost, {
-    global: { stubs: { TransitionGroup: { template: '<div><slot /></div>' } } },
+    global: { plugins: [i18n], stubs: { TransitionGroup: { template: '<div><slot /></div>' } } },
   })
 }
 

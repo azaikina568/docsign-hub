@@ -1,5 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { server } from './msw/server'
+import { i18n } from '@/shared/i18n'
+
+// Тесты гоняем на английской локали детерминированно (ассерты сверяют англоязычные строки),
+// чтобы результат не зависел от navigator.language тестовой среды.
+i18n.global.locale.value = 'en'
 
 // Node 24 заводит экспериментальный глобальный localStorage (за флагом --localstorage-file) и перебивает
 // localStorage тестовой DOM-среды. Ставим детерминированный in-memory Storage — на нём работает tokens.ts.

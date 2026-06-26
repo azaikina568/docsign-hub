@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAddParty } from '@/features/documents/queries'
 import type { PartyRole } from '@/shared/api/documents'
 import { normalizeError } from '@/shared/api/errors'
@@ -8,6 +9,7 @@ import { partySchema, validate } from '@/shared/validation'
 import FormField from '@/components/FormField.vue'
 import AppButton from '@/components/AppButton.vue'
 
+const { t } = useI18n()
 const props = defineProps<{ documentId: string }>()
 
 const addParty = useAddParty(props.documentId)
@@ -32,7 +34,7 @@ async function onSubmit(): Promise<void> {
     form.name = ''
     form.email = ''
     form.role = 'signer'
-    toast.success('Party added.')
+    toast.success(t('addParty.toastAdded'))
   } catch (error) {
     const normalized = normalizeError(error)
     errors.value = normalized.fields
@@ -47,27 +49,33 @@ async function onSubmit(): Promise<void> {
     novalidate
     @submit.prevent="onSubmit"
   >
-    <p class="text-sm font-medium text-slate-700">Add a party</p>
+    <p class="text-sm font-medium text-slate-700">{{ t('addParty.heading') }}</p>
     <p v-if="generalError" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ generalError }}</p>
 
     <div class="grid gap-3 sm:grid-cols-2">
-      <FormField id="party-name" v-model="form.name" label="Name" :error="errors.name" />
-      <FormField id="party-email" v-model="form.email" label="Email" type="email" :error="errors.email" />
+      <FormField id="party-name" v-model="form.name" :label="t('addParty.name')" :error="errors.name" />
+      <FormField
+        id="party-email"
+        v-model="form.email"
+        :label="t('addParty.email')"
+        type="email"
+        :error="errors.email"
+      />
     </div>
 
     <div class="flex items-end gap-3">
       <div class="flex flex-col gap-1.5">
-        <label for="party-role" class="text-sm font-medium text-slate-700">Role</label>
+        <label for="party-role" class="text-sm font-medium text-slate-700">{{ t('addParty.role') }}</label>
         <select
           id="party-role"
           v-model="form.role"
           class="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
         >
-          <option value="signer">Signer</option>
-          <option value="viewer">Viewer</option>
+          <option value="signer">{{ t('party.role.signer') }}</option>
+          <option value="viewer">{{ t('party.role.viewer') }}</option>
         </select>
       </div>
-      <AppButton type="submit" :loading="addParty.isPending.value">Add</AppButton>
+      <AppButton type="submit" :loading="addParty.isPending.value">{{ t('addParty.submit') }}</AppButton>
     </div>
   </form>
 </template>

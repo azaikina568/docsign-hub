@@ -17,15 +17,16 @@ DocSign Hub — демонстрационный сервис электронн
 верификацией email), документы и строго последовательное подписание по модели «capability или identity»;
 доменные события идут через transactional outbox в RabbitMQ, consumer'ы рассылают приглашения по очереди и
 пишут audit в MongoDB. **Фронтенд:** полноценный SPA (auth с прозрачным refresh, документы, публичное
-подписание, верификация email, единые toast'ы и валидация форм), покрыт юнит/компонентными тестами.
+подписание, верификация email, единые toast'ы и валидация форм, локализация en/ru), покрыт юнит/компонентными
+и сквозным e2e (Playwright) тестами.
 
-Дальше — сквозной e2e (Playwright), i18n и CI (см. [Roadmap](#roadmap)).
+Дальше — CI (см. [Roadmap](#roadmap)).
 
 ## Стек
 
 - **Backend:** PHP 8.4, Laravel 12, PostgreSQL, Redis (rate-limit/cache/locks),
   RabbitMQ (доменные события через outbox), MongoDB (audit-журнал), Mailpit (почта в dev).
-- **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (компоненты вручную), TanStack Query, Pinia, zod;
+- **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (компоненты вручную), TanStack Query, Pinia, zod, vue-i18n (en/ru);
   Vitest + Vue Test Utils + MSW, Playwright (e2e), ESLint + Prettier.
 - **Инфраструктура/инструменты:** Docker Compose (+ отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint,
   PHPStan/Larastan, OpenAPI/Swagger (Scramble).
@@ -83,6 +84,8 @@ DocSign Hub — демонстрационный сервис электронн
 - Frontend UX: единые toast-уведомления (успех/ошибка действий), нормализация ошибок бэка по кодам
   (401/403/404/409/410/422/429/5xx → понятный текст, без «голых» 500), клиентская валидация форм (zod) с подсказкой
   требований к паролю, «дублировать» терминальный документ в новый draft, mobile-first адаптив.
+- Frontend локализация: vue-i18n со словарями en/ru, переключатель языка (выбор сохраняется в localStorage,
+  язык определяется по браузеру при первом заходе), формат дат по локали, плюрализация (в т.ч. русские формы).
 - Frontend-тесты и стандарты: Vitest + Vue Test Utils + MSW (юнит/компонентные/интеграционные — валидация, нормализация
   ошибок, тосты, формат, стор, прозрачный refresh клиента), Playwright e2e сквозного сценария подписания против живого
   стека; ESLint (vue/ts) + Prettier (`npm run lint` / `format:check`).
@@ -91,7 +94,6 @@ DocSign Hub — демонстрационный сервис электронн
 
 | Дальше | Что |
 | --- | --- |
-| Frontend i18n | vue-i18n (словари en+ru, формат дат/чисел по локали) |
 | CI, docs, cleanup | GitHub Actions (+ GitLab CI), каталог событий (AsyncAPI), финальная документация |
 
 Будущие треки (поиск/Elasticsearch, observability, k8s, микросервисы/gRPC) — за рамками MVP.
@@ -193,7 +195,7 @@ GitHub и на `/docs/diagrams`).
 
 ```
 backend/    Laravel 12 API (app/Domain, app/Http, config, database, tests)
-frontend/   Vue 3 + TS + Vite SPA (api-клиент, refresh, stores, router, pages; тесты Vitest + MSW, ESLint/Prettier)
+frontend/   Vue 3 + TS + Vite SPA (api-клиент, refresh, stores, router, pages, i18n en/ru; тесты Vitest + MSW, ESLint/Prettier)
 contracts/  версионированные контракты событий (JSON Schema) для RabbitMQ
 docs/       architecture.md, diagrams.md
 infra/      Docker-обвязка (nginx, php Dockerfile)
@@ -243,5 +245,6 @@ npm run e2e                        # сквозной сценарий подп�
 - Publisher и consumer'ы — по одному инстансу (без конкурентного вычитывания); горизонтальное
   масштабирование (`FOR UPDATE SKIP LOCKED`, несколько воркеров) описано, но намеренно не включено.
 - Audit-журнал в MongoDB пишется append-only; UI/поиск по нему — будущий трек.
-- Frontend покрыт юнит/компонентными тестами (Vitest + MSW) и сквозным e2e (Playwright) основного сценария; локализация (i18n) — следующий шаг.
+- Frontend покрыт юнит/компонентными тестами (Vitest + MSW) и сквозным e2e (Playwright) основного сценария; локализован
+  на en/ru (vue-i18n). Локализация писем/бэкенда (язык по получателю) — будущий трек.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.
