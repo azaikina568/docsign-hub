@@ -24,9 +24,12 @@ fresh:
 
 test:
 	$(COMPOSE) exec -T backend php artisan test
+	$(COMPOSE) exec -T frontend npm run test:run
 
 lint:
 	$(COMPOSE) exec -T backend ./vendor/bin/pint --test
 	$(COMPOSE) exec -T backend ./vendor/bin/phpstan analyse
+	$(COMPOSE) exec -T frontend npm run lint
+	$(COMPOSE) exec -T frontend npm run format:check
 	$(COMPOSE) exec -T frontend npm run type-check
 	$(COMPOSE) exec -T frontend npm run build

@@ -13,10 +13,9 @@ const removeParty = useRemoveParty(props.documentId)
       <div class="min-w-0">
         <p class="truncate text-sm font-medium text-slate-900">
           {{ party.name }}
-          <span
-            v-if="party.role === 'signer'"
-            class="ml-1 text-xs font-normal text-slate-400"
-          >#{{ party.signing_order }}</span>
+          <span v-if="party.role === 'signer'" class="ml-1 text-xs font-normal text-slate-400"
+            >#{{ party.signing_order }}</span
+          >
         </p>
         <p class="truncate text-xs text-slate-400">{{ party.email }}</p>
       </div>

@@ -60,12 +60,7 @@ async function onResend(): Promise<void> {
       >
         <span>Verify your email to start creating documents — check your inbox for the link.</span>
         <span v-if="resent" class="font-medium text-amber-900">Sent — check your inbox.</span>
-        <button
-          v-else
-          class="font-medium underline disabled:opacity-50"
-          :disabled="resending"
-          @click="onResend"
-        >
+        <button v-else class="font-medium underline disabled:opacity-50" :disabled="resending" @click="onResend">
           Resend link
         </button>
       </div>

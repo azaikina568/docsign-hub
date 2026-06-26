@@ -81,8 +81,8 @@ const { data, isPending, isError, isPlaceholderData } = useDocumentsQuery(status
           <div class="min-w-0">
             <p class="truncate font-medium text-slate-900">{{ doc.title }}</p>
             <p class="mt-0.5 text-xs text-slate-400">
-              {{ doc.parties_count ?? 0 }} {{ (doc.parties_count ?? 0) === 1 ? 'party' : 'parties' }}
-              · created {{ formatDate(doc.created_at) }}
+              {{ doc.parties_count ?? 0 }} {{ (doc.parties_count ?? 0) === 1 ? 'party' : 'parties' }} · created
+              {{ formatDate(doc.created_at) }}
             </p>
           </div>
           <div class="flex shrink-0 items-center gap-2">

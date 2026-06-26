@@ -41,7 +41,9 @@ const documentOpen = computed(
 // Account-bound: подписать может только сам участник под своим логином (сверяем по email).
 const loggedInAsParty = computed(() => auth.isAuthenticated && auth.user?.email === ctx.value?.party.email)
 const percent = computed(() =>
-  ctx.value && ctx.value.progress.total > 0 ? Math.round((ctx.value.progress.signed / ctx.value.progress.total) * 100) : 0,
+  ctx.value && ctx.value.progress.total > 0
+    ? Math.round((ctx.value.progress.signed / ctx.value.progress.total) * 100)
+    : 0,
 )
 const needsLogin = computed(
   () =>
@@ -94,8 +96,9 @@ async function onSign(): Promise<void> {
         <div>
           <h1 class="text-lg font-semibold text-slate-900">{{ ctx.document.title }}</h1>
           <p class="mt-1 text-sm text-slate-500">
-            You're invited as <span class="font-medium text-slate-700">{{ ctx.party.name }}</span>
-            ({{ ctx.party.email }}) · {{ ctx.party.role }}
+            You're invited as <span class="font-medium text-slate-700">{{ ctx.party.name }}</span> ({{
+              ctx.party.email
+            }}) · {{ ctx.party.role }}
           </p>
         </div>
         <StatusBadge :status="ctx.document.status" />
@@ -116,7 +119,8 @@ async function onSign(): Promise<void> {
         <p v-if="ctx.already_signed" class="text-sm text-green-600">
           <template v-if="justSigned">Thank you! Your signature is recorded</template>
           <template v-else>You have already signed this document</template>
-          <span v-if="ctx.party.signed_at"> on {{ formatDateTime(ctx.party.signed_at) }}</span>.
+          <span v-if="ctx.party.signed_at"> on {{ formatDateTime(ctx.party.signed_at) }}</span
+          >.
         </p>
 
         <p v-else-if="isViewer" class="text-sm text-slate-500">
@@ -134,7 +138,9 @@ async function onSign(): Promise<void> {
         </p>
 
         <div v-else-if="needsLogin" class="flex flex-col gap-2">
-          <p class="text-sm text-slate-600">This document is tied to your account. Sign in as {{ ctx.party.email }} to sign.</p>
+          <p class="text-sm text-slate-600">
+            This document is tied to your account. Sign in as {{ ctx.party.email }} to sign.
+          </p>
           <RouterLink
             :to="{ name: 'login', query: { redirect: route.fullPath } }"
             class="inline-flex w-fit rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"

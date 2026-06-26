@@ -147,6 +147,37 @@ covers every later owner action (send/cancel/parties/deadline) — they only exi
 an already-verified owner. `DocumentPolicy::create` is also the extension point for a future
 who-may-create policy (invite-only / quota / subscription — see `plans/OPEN_QUESTIONS.md` Q2).
 
+## Frontend (SPA)
+
+The `frontend/` is a Vue 3 + TypeScript + Vite single-page app. Code is grouped by concern:
+`shared/` (API layer, helpers), `features/` (domain UI + TanStack Query composables), `pages/`,
+`components/`, `layouts/`, `stores/`, `router/`.
+
+**State.** Server state lives in TanStack Query (`features/*/queries.ts`, keyed caches with targeted
+invalidation); Pinia holds only client/auth state (the `auth` store). The two never duplicate the
+same source of truth.
+
+**API layer.** A single typed axios client (`shared/api/client.ts`) attaches the Bearer access token
+on every request and, on a `401`, performs a **transparent refresh** against `/auth/refresh` and
+retries the original request once. Parallel `401`s share one in-flight refresh (single-flight); a
+failed refresh clears the session and notifies the app through a `setAuthExpiredHandler` callback, so
+the client stays decoupled from the router and store. Tokens live in `localStorage` behind one owner
+module (`shared/api/tokens.ts`).
+
+**Errors & UX.** API errors are normalized by status code (`normalizeError`): `5xx` collapses to a
+neutral message (no raw "Server Error"/traces), `401/429` get fixed copy, domain `4xx` surface the
+backend message, `422` maps to per-field errors. Feedback goes through one accessible toast singleton
+rendered outside the keyed `RouterView` so it survives navigation. Forms validate client-side with
+zod schemas that mirror the server rules (the server stays authoritative — its `422` still shows).
+
+**Routing.** `requiresAuth`/`guestOnly` guards with per-route code splitting (lazy pages).
+
+**Testing.** Vitest + Vue Test Utils + MSW on happy-dom: unit (validation, error normalization,
+toasts, formatting), components (FormField, ToastHost), the auth store, query composables (the
+duplicate flow), and the client's transparent-refresh integration. ESLint (vue + typescript-eslint,
+formatting delegated to Prettier) and Prettier enforce one style; `tsconfig.vitest.json` type-checks
+tests apart from the production build.
+
 ## API documentation
 
 The OpenAPI document is generated from the code (routes, Form Requests, Resources) by Scramble and
@@ -224,7 +255,7 @@ document.expired.v1
 ## Towards services (future-proofing)
 
 The monolith is organised as bounded contexts under `app/Domain/<Context>` (today: `Documents`,
-`Users`). The rules that keep them splittable later:
+`Users`, `Messaging`). The rules that keep them splittable later:
 
 - Cross-context side effects go through **domain events** + **contracts (interfaces)**, never direct
   calls into another context's internals. The notifications and audit consumers attach to the same

@@ -43,7 +43,9 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <AppLayout>
-    <RouterLink :to="{ name: 'dashboard' }" class="text-sm text-slate-500 hover:underline">← Back to documents</RouterLink>
+    <RouterLink :to="{ name: 'dashboard' }" class="text-sm text-slate-500 hover:underline"
+      >← Back to documents</RouterLink
+    >
 
     <h1 class="mt-3 text-xl font-semibold text-slate-900">New document</h1>
 
@@ -62,13 +64,17 @@ async function onSubmit(): Promise<void> {
         />
         <p v-if="errors.expires_at" class="text-sm text-red-600">{{ errors.expires_at }}</p>
         <p class="text-xs text-slate-400">
-          If left empty, a default 14-day deadline is applied when the document is sent. Signing links stay valid until then.
+          If left empty, a default 14-day deadline is applied when the document is sent. Signing links stay valid until
+          then.
         </p>
       </div>
 
       <div class="flex gap-2">
         <AppButton type="submit" :loading="createDocument.isPending.value">Create draft</AppButton>
-        <RouterLink :to="{ name: 'dashboard' }" class="inline-flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md">
+        <RouterLink
+          :to="{ name: 'dashboard' }"
+          class="inline-flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+        >
           Cancel
         </RouterLink>
       </div>

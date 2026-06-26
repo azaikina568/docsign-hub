@@ -42,7 +42,11 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <form class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4" novalidate @submit.prevent="onSubmit">
+  <form
+    class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4"
+    novalidate
+    @submit.prevent="onSubmit"
+  >
     <p class="text-sm font-medium text-slate-700">Add a party</p>
     <p v-if="generalError" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ generalError }}</p>
 

@@ -1,23 +1,32 @@
 # DocSign Hub
 
 DocSign Hub — демонстрационный сервис электронного подписания документов (envelope → участники →
-последовательная подпись → audit trail). Pet-проект: Laravel-бэкенд с доменной логикой, задел под событийную архитектуру (очереди/outbox) и Docker-инфраструктуру.
+последовательная подпись → audit trail). Pet-проект: Laravel-бэкенд с доменной логикой, задел под
+событийную архитектуру (очереди/outbox), Vue 3 SPA и Docker-инфраструктуру.
 
 > Это demo, **не** юридически значимая система ЭЦП. Подпись здесь — демонстрационная (хеш-привязка к снимку
 > содержимого), без реальной криптографии/КЭП.
 
+**Навигация:** [Статус](#статус) · [Стек](#стек) · [Возможности](#возможности-реализовано) ·
+[Запуск](#запуск) · [API](#api) · [Архитектура](#архитектура) · [Тесты](#тесты-и-проверки) ·
+[Ограничения](#осознанные-ограничения) · [Roadmap](#roadmap)
+
 ## Статус
 
-Бэкенд закрывает основной поток подписания: аутентификация (с верификацией email), документы и строго
-последовательное подписание по модели «capability или identity». Доменные события идут через transactional
-outbox в RabbitMQ, а consumer'ы рассылают приглашения по очереди и пишут audit в MongoDB. На фронте заложена
-аутентификация (login/register, прозрачный refresh, защищённые роуты); остальной UI — в работе (см. [Roadmap](#roadmap)).
+Сквозной поток работает целиком — от регистрации до подписанного документа. **Бэкенд:** аутентификация (с
+верификацией email), документы и строго последовательное подписание по модели «capability или identity»;
+доменные события идут через transactional outbox в RabbitMQ, consumer'ы рассылают приглашения по очереди и
+пишут audit в MongoDB. **Фронтенд:** полноценный SPA (auth с прозрачным refresh, документы, публичное
+подписание, верификация email, единые toast'ы и валидация форм), покрыт юнит/компонентными тестами.
+
+Дальше — сквозной e2e (Playwright), i18n и CI (см. [Roadmap](#roadmap)).
 
 ## Стек
 
 - **Backend:** PHP 8.4, Laravel 12, PostgreSQL, Redis (rate-limit/cache/locks),
   RabbitMQ (доменные события через outbox), MongoDB (audit-журнал), Mailpit (почта в dev).
-- **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS, TanStack Query, Pinia, shadcn-vue-ready структура.
+- **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (компоненты вручную), TanStack Query, Pinia, zod;
+  Vitest + Vue Test Utils + MSW, ESLint + Prettier.
 - **Инфраструктура/инструменты:** Docker Compose (+ отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint,
   PHPStan/Larastan, OpenAPI/Swagger (Scramble).
 
@@ -74,12 +83,14 @@ outbox в RabbitMQ, а consumer'ы рассылают приглашения п�
 - Frontend UX: единые toast-уведомления (успех/ошибка действий), нормализация ошибок бэка по кодам
   (401/403/404/409/410/422/429/5xx → понятный текст, без «голых» 500), клиентская валидация форм (zod) с подсказкой
   требований к паролю, «дублировать» терминальный документ в новый draft, mobile-first адаптив.
+- Frontend-тесты и стандарты: Vitest + Vue Test Utils + MSW (юнит/компонентные/интеграционные — валидация, нормализация
+  ошибок, тосты, формат, прозрачный refresh клиента); ESLint (vue/ts) + Prettier (`npm run lint` / `format:check`).
 
 ## Roadmap
 
 | Дальше | Что |
 | --- | --- |
-| Frontend-тесты и стандарты | Vitest + Vue Test Utils + MSW, e2e (Playwright), ESLint + Prettier, i18n |
+| Frontend e2e + i18n | Playwright (основной сценарий с асинхронными приглашениями), vue-i18n |
 | CI, docs, cleanup | GitHub Actions (+ GitLab CI), каталог событий (AsyncAPI), финальная документация |
 
 Будущие треки (поиск/Elasticsearch, observability, k8s, микросервисы/gRPC) — за рамками MVP.
@@ -181,7 +192,7 @@ GitHub и на `/docs/diagrams`).
 
 ```
 backend/    Laravel 12 API (app/Domain, app/Http, config, database, tests)
-frontend/   Vue 3 + TS + Vite SPA (auth-фундамент: api-клиент, refresh, stores, router, pages)
+frontend/   Vue 3 + TS + Vite SPA (api-клиент, refresh, stores, router, pages; тесты Vitest + MSW, ESLint/Prettier)
 contracts/  версионированные контракты событий (JSON Schema) для RabbitMQ
 docs/       architecture.md, diagrams.md
 infra/      Docker-обвязка (nginx, php Dockerfile)
@@ -206,7 +217,10 @@ php artisan test
 Frontend (из `frontend/`):
 
 ```bash
+npm run lint          # ESLint (vue/ts)
+npm run format:check  # Prettier
 npm run type-check
+npm run test:run      # Vitest (юнит/компонентные/MSW)
 npm run build
 ```
 
@@ -217,5 +231,5 @@ npm run build
 - Publisher и consumer'ы — по одному инстансу (без конкурентного вычитывания); горизонтальное
   масштабирование (`FOR UPDATE SKIP LOCKED`, несколько воркеров) описано, но намеренно не включено.
 - Audit-журнал в MongoDB пишется append-only; UI/поиск по нему — будущий трек.
-- Frontend — каркас (экран health-check); полноценный UI — отдельный этап.
+- Frontend покрыт юнит/компонентными тестами (Vitest + MSW); сквозной e2e (Playwright) и i18n — следующий шаг.
 - Go-сервис, Kubernetes и production-grade retry/DLQ не входят в основной MVP.

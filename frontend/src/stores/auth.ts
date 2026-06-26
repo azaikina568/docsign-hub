@@ -37,8 +37,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout(): Promise<void> {
     try {
       await authApi.logout()
+    } catch {
+      // Сервер мог не ответить (5xx/сеть) — это не должно мешать локально завершить сессию и увести на login.
     } finally {
-      // Даже если запрос не прошёл — локально разлогиниваемся.
       reset()
     }
   }

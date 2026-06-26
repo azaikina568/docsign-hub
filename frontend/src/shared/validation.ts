@@ -3,10 +3,7 @@ import { z } from 'zod'
 // Клиентские схемы зеркалят серверные правила (dev-минимум Password::defaults и Form Requests),
 // чтобы ловить очевидные ошибки до запроса. Сервер остаётся источником истины — его 422 всё равно показываем.
 
-export const passwordRules = [
-  'At least 8 characters',
-  'At least one letter and one number',
-]
+export const passwordRules = ['At least 8 characters', 'At least one letter and one number']
 
 export const passwordSchema = z
   .string()

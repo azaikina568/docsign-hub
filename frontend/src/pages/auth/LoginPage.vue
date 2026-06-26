@@ -73,7 +73,9 @@ async function onSubmit(): Promise<void> {
 
       <p class="mt-4 text-center text-sm text-slate-500">
         No account?
-        <RouterLink :to="{ name: 'register' }" class="font-medium text-slate-900 hover:underline">Create one</RouterLink>
+        <RouterLink :to="{ name: 'register' }" class="font-medium text-slate-900 hover:underline"
+          >Create one</RouterLink
+        >
       </p>
     </div>
   </div>

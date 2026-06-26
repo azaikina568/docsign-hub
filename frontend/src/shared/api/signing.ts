@@ -5,7 +5,14 @@ import type { ResourceResponse } from './types'
 // Контекст подписания по capability-токену: своё участие + агрегированный прогресс (чужих не раскрываем).
 export interface SigningContext {
   document: { id: string; title: string; status: DocumentStatus; expires_at: string | null }
-  party: { name: string; email: string; role: PartyRole; signing_order: number | null; status: PartyStatus; signed_at: string | null }
+  party: {
+    name: string
+    email: string
+    role: PartyRole
+    signing_order: number | null
+    status: PartyStatus
+    signed_at: string | null
+  }
   progress: { signed: number; total: number }
   requires_account: boolean
   already_signed: boolean

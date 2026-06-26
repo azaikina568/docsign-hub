@@ -36,7 +36,10 @@ const isDraft = computed(() => document.value?.status === 'draft')
 const isOpen = computed(() => document.value?.status === 'pending' || document.value?.status === 'partially_signed')
 // Терминальные документы неизменны — их можно только продублировать в новый draft.
 const isTerminal = computed(
-  () => document.value?.status === 'signed' || document.value?.status === 'cancelled' || document.value?.status === 'expired',
+  () =>
+    document.value?.status === 'signed' ||
+    document.value?.status === 'cancelled' ||
+    document.value?.status === 'expired',
 )
 const hasSigner = computed(() => document.value?.parties.some((p) => p.role === 'signer') ?? false)
 
@@ -99,7 +102,9 @@ async function onDuplicate(): Promise<void> {
 
 <template>
   <AppLayout>
-    <RouterLink :to="{ name: 'dashboard' }" class="text-sm text-slate-500 hover:underline">← Back to documents</RouterLink>
+    <RouterLink :to="{ name: 'dashboard' }" class="text-sm text-slate-500 hover:underline"
+      >← Back to documents</RouterLink
+    >
 
     <div v-if="isPending" class="mt-8 text-center text-sm text-slate-400">Loading document…</div>
     <div v-else-if="isError || !document" class="mt-8 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -132,7 +137,10 @@ async function onDuplicate(): Promise<void> {
         This document is finalised and can’t be changed. Duplicate it to start a new draft with the same parties.
       </p>
 
-      <div v-if="cancelOpen" class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md">
+      <div
+        v-if="cancelOpen"
+        class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md"
+      >
         <label for="cancel-reason" class="text-sm font-medium text-slate-700">Reason (optional)</label>
         <textarea
           id="cancel-reason"
@@ -143,7 +151,10 @@ async function onDuplicate(): Promise<void> {
         <AppButton :loading="cancelDoc.isPending.value" @click="onCancel">Confirm cancellation</AppButton>
       </div>
 
-      <div v-if="extendOpen" class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md">
+      <div
+        v-if="extendOpen"
+        class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md"
+      >
         <label for="new-deadline" class="text-sm font-medium text-slate-700">New deadline</label>
         <input
           id="new-deadline"
