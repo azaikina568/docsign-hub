@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { getSigningContext, signWithToken, type SigningContext } from '@/shared/api/signing'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeError } from '@/shared/api/errors'
+import { toast } from '@/shared/toast'
 import { formatDateTime, statusLabel } from '@/shared/format'
 import PublicLayout from '@/layouts/PublicLayout.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -16,7 +17,6 @@ const token = route.params.token as string
 const context = ref<SigningContext | null>(null)
 const loading = ref(true)
 const loadError = ref('')
-const actionError = ref('')
 const signing = ref(false)
 const justSigned = ref(false)
 
@@ -66,14 +66,14 @@ const canSign = computed(() => {
 
 async function onSign(): Promise<void> {
   signing.value = true
-  actionError.value = ''
 
   try {
     await signWithToken(token)
     justSigned.value = true
+    toast.success('Thank you! Your signature is recorded.')
     await load()
   } catch (error) {
-    actionError.value = normalizeError(error).message
+    toast.error(normalizeError(error).message)
   } finally {
     signing.value = false
   }
@@ -111,8 +111,6 @@ async function onSign(): Promise<void> {
         </div>
         <p class="mt-2 text-xs text-slate-400">Deadline: {{ formatDateTime(ctx.document.expires_at) }}</p>
       </div>
-
-      <p v-if="actionError" class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ actionError }}</p>
 
       <div class="mt-5 border-t border-slate-100 pt-5">
         <p v-if="ctx.already_signed" class="text-sm text-green-600">

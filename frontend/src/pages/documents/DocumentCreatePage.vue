@@ -3,6 +3,8 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCreateDocument } from '@/features/documents/queries'
 import { normalizeError } from '@/shared/api/errors'
+import { toast } from '@/shared/toast'
+import { createDocumentSchema, validate } from '@/shared/validation'
 import AppLayout from '@/layouts/AppLayout.vue'
 import FormField from '@/components/FormField.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -15,13 +17,21 @@ const errors = ref<Record<string, string>>({})
 const generalError = ref('')
 
 async function onSubmit(): Promise<void> {
-  errors.value = {}
   generalError.value = ''
+
+  const clientErrors = validate(createDocumentSchema, { title: form.title })
+  if (clientErrors) {
+    errors.value = clientErrors
+    return
+  }
+
+  errors.value = {}
 
   try {
     // datetime-local — локальное время без зоны; приводим к ISO для бэкенда (правило after:now).
     const expires_at = form.expiresAt ? new Date(form.expiresAt).toISOString() : null
     const doc = await createDocument.mutateAsync({ title: form.title, expires_at })
+    toast.success('Draft created.')
     await router.push({ name: 'document-detail', params: { id: doc.id } })
   } catch (error) {
     const normalized = normalizeError(error)

@@ -5,10 +5,12 @@ import {
   useCancelDocument,
   useDeleteDocument,
   useDocumentQuery,
+  useDuplicateDocument,
   useExtendDeadline,
   useSendDocument,
 } from '@/features/documents/queries'
 import { normalizeError } from '@/shared/api/errors'
+import { toast } from '@/shared/toast'
 import { formatDateTime } from '@/shared/format'
 import AppLayout from '@/layouts/AppLayout.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -28,36 +30,41 @@ const sendDoc = useSendDocument(id)
 const cancelDoc = useCancelDocument(id)
 const deleteDoc = useDeleteDocument(id)
 const extendDoc = useExtendDeadline(id)
+const duplicateDoc = useDuplicateDocument()
 
 const isDraft = computed(() => document.value?.status === 'draft')
 const isOpen = computed(() => document.value?.status === 'pending' || document.value?.status === 'partially_signed')
+// Терминальные документы неизменны — их можно только продублировать в новый draft.
+const isTerminal = computed(
+  () => document.value?.status === 'signed' || document.value?.status === 'cancelled' || document.value?.status === 'expired',
+)
 const hasSigner = computed(() => document.value?.parties.some((p) => p.role === 'signer') ?? false)
 
-const actionError = ref('')
 const cancelOpen = ref(false)
 const cancelReason = ref('')
 const extendOpen = ref(false)
 const newDeadline = ref('')
 
-async function run(fn: () => Promise<unknown>): Promise<void> {
-  actionError.value = ''
+// Действие + единое уведомление: успех/ошибку показываем тостом, без дублирующего инлайна.
+async function run(fn: () => Promise<unknown>, successMessage: string): Promise<void> {
   try {
     await fn()
+    toast.success(successMessage)
   } catch (error) {
-    actionError.value = normalizeError(error).message
+    toast.error(normalizeError(error).message)
   }
 }
 
 async function onSend(): Promise<void> {
   if (!hasSigner.value) {
-    actionError.value = 'Add at least one signer before sending.'
+    toast.error('Add at least one signer before sending.')
     return
   }
-  await run(() => sendDoc.mutateAsync(undefined))
+  await run(() => sendDoc.mutateAsync(undefined), 'Document sent for signing.')
 }
 
 async function onCancel(): Promise<void> {
-  await run(() => cancelDoc.mutateAsync(cancelReason.value || undefined))
+  await run(() => cancelDoc.mutateAsync(cancelReason.value || undefined), 'Document cancelled.')
   cancelOpen.value = false
 }
 
@@ -65,7 +72,7 @@ async function onExtend(): Promise<void> {
   if (!newDeadline.value) {
     return
   }
-  await run(() => extendDoc.mutateAsync(new Date(newDeadline.value).toISOString()))
+  await run(() => extendDoc.mutateAsync(new Date(newDeadline.value).toISOString()), 'Deadline moved.')
   extendOpen.value = false
 }
 
@@ -73,7 +80,20 @@ async function onDelete(): Promise<void> {
   await run(async () => {
     await deleteDoc.mutateAsync()
     await router.push({ name: 'dashboard' })
-  })
+  }, 'Draft deleted.')
+}
+
+async function onDuplicate(): Promise<void> {
+  if (!document.value) {
+    return
+  }
+  try {
+    const draft = await duplicateDoc.mutateAsync(document.value)
+    toast.success('Created a new draft from this document.')
+    await router.push({ name: 'document-detail', params: { id: draft.id } })
+  } catch (error) {
+    toast.error(normalizeError(error).message)
+  }
 }
 </script>
 
@@ -98,15 +118,19 @@ async function onDelete(): Promise<void> {
         <StatusBadge :status="document.status" />
       </div>
 
-      <p v-if="actionError" class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ actionError }}</p>
-
-      <!-- Действия зависят от стадии: draft — состав и отправка; открытый — отмена/продление; терминальный — только чтение. -->
+      <!-- Действия зависят от стадии: draft — состав и отправка; открытый — отмена/продление; терминальный — дублирование. -->
       <div class="mt-4 flex flex-wrap gap-2">
         <AppButton v-if="isDraft" :loading="sendDoc.isPending.value" @click="onSend">Send for signing</AppButton>
         <AppButton v-if="isDraft" variant="ghost" @click="onDelete">Delete draft</AppButton>
         <AppButton v-if="isOpen" variant="ghost" @click="cancelOpen = !cancelOpen">Cancel</AppButton>
         <AppButton v-if="isOpen" variant="ghost" @click="extendOpen = !extendOpen">Extend deadline</AppButton>
+        <AppButton v-if="isTerminal" :loading="duplicateDoc.isPending.value" @click="onDuplicate">
+          Duplicate
+        </AppButton>
       </div>
+      <p v-if="isTerminal" class="mt-2 text-xs text-slate-400">
+        This document is finalised and can’t be changed. Duplicate it to start a new draft with the same parties.
+      </p>
 
       <div v-if="cancelOpen" class="mt-3 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:max-w-md">
         <label for="cancel-reason" class="text-sm font-medium text-slate-700">Reason (optional)</label>

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { listSigningRequests, signAsIdentity } from '@/shared/api/signing'
 import { normalizeError } from '@/shared/api/errors'
+import { toast } from '@/shared/toast'
 import { formatDateTime } from '@/shared/format'
 import AppLayout from '@/layouts/AppLayout.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -10,7 +11,6 @@ import StatusBadge from '@/features/documents/StatusBadge.vue'
 
 const client = useQueryClient()
 const page = ref(1)
-const actionError = ref('')
 
 const { data, isPending, isError } = useQuery({
   queryKey: ['signing-requests', page],
@@ -23,14 +23,12 @@ const signMutation = useMutation({
     // После подписи участие уходит из pending; могло измениться и состояние документа.
     void client.invalidateQueries({ queryKey: ['signing-requests'] })
     void client.invalidateQueries({ queryKey: ['documents', 'list'] })
+    toast.success('Signed. Thank you!')
   },
-  onError: (error) => {
-    actionError.value = normalizeError(error).message
-  },
+  onError: (error) => toast.error(normalizeError(error).message),
 })
 
 function sign(partyId: number): void {
-  actionError.value = ''
   signMutation.mutate(partyId)
 }
 </script>
@@ -39,8 +37,6 @@ function sign(partyId: number): void {
   <AppLayout>
     <h1 class="text-xl font-semibold text-slate-900">Awaiting your signature</h1>
     <p class="mt-1 text-sm text-slate-500">Documents where you're a signer and it's your turn or you're up next.</p>
-
-    <p v-if="actionError" class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ actionError }}</p>
 
     <div v-if="isPending" class="mt-8 text-center text-sm text-slate-400">Loading…</div>
     <div v-else-if="isError" class="mt-8 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">

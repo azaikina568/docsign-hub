@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { Ref } from 'vue'
 import * as docs from '@/shared/api/documents'
-import type { AddPartyPayload, CreateDocumentPayload, DocumentStatus } from '@/shared/api/documents'
+import type { AddPartyPayload, CreateDocumentPayload, DocumentDetail, DocumentStatus } from '@/shared/api/documents'
 
 // Ключи кэша в одном месте — чтобы инвалидация после мутаций была точечной и не разъезжалась.
 // Списки инвалидируем по префиксу ['documents','list'] (vue-query матчит частично).
@@ -77,6 +77,28 @@ export function useAddParty(id: string) {
 
 export function useRemoveParty(id: string) {
   return useDocumentMutation(id, (partyId: number) => docs.removeParty(id, partyId))
+}
+
+// «Дублировать» терминальный документ: терминальные статусы неизменны (аудит), поэтому вместо reopen
+// собираем новый draft из копии title + участников. Подписи/токены не переносим. См. DOCUMENT_LIFECYCLE.md.
+export function useDuplicateDocument() {
+  const client = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (source: DocumentDetail) => {
+      const draft = await docs.createDocument({ title: source.title })
+
+      // Порядок участников сохраняем; signing_order бэкенд назначит сам для signer'ов.
+      const ordered = [...source.parties].sort((a, b) => (a.signing_order ?? 0) - (b.signing_order ?? 0))
+
+      for (const party of ordered) {
+        await docs.addParty(draft.id, { name: party.name, email: party.email, role: party.role })
+      }
+
+      return draft
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: documentKeys.lists }),
+  })
 }
 
 export function useDeleteDocument(id: string) {

@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeError } from '@/shared/api/errors'
+import { passwordRules, registerSchema, validate } from '@/shared/validation'
 import FormField from '@/components/FormField.vue'
 import AppButton from '@/components/AppButton.vue'
 
@@ -15,9 +16,17 @@ const generalError = ref('')
 const loading = ref(false)
 
 async function onSubmit(): Promise<void> {
+  generalError.value = ''
+
+  // Клиентская проверка до запроса; серверная 422 остаётся источником истины.
+  const clientErrors = validate(registerSchema, form)
+  if (clientErrors) {
+    errors.value = clientErrors
+    return
+  }
+
   loading.value = true
   errors.value = {}
-  generalError.value = ''
 
   try {
     await auth.register({ ...form })
@@ -50,14 +59,19 @@ async function onSubmit(): Promise<void> {
           autocomplete="email"
           :error="errors.email"
         />
-        <FormField
-          id="password"
-          v-model="form.password"
-          label="Password"
-          type="password"
-          autocomplete="new-password"
-          :error="errors.password"
-        />
+        <div>
+          <FormField
+            id="password"
+            v-model="form.password"
+            label="Password"
+            type="password"
+            autocomplete="new-password"
+            :error="errors.password"
+          />
+          <ul class="mt-1.5 list-disc pl-5 text-xs text-slate-400">
+            <li v-for="rule in passwordRules" :key="rule">{{ rule }}</li>
+          </ul>
+        </div>
         <FormField
           id="password_confirmation"
           v-model="form.password_confirmation"

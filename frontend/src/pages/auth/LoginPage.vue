@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeError } from '@/shared/api/errors'
+import { loginSchema, validate } from '@/shared/validation'
 import FormField from '@/components/FormField.vue'
 import AppButton from '@/components/AppButton.vue'
 
@@ -16,9 +17,16 @@ const generalError = ref('')
 const loading = ref(false)
 
 async function onSubmit(): Promise<void> {
+  generalError.value = ''
+
+  const clientErrors = validate(loginSchema, form)
+  if (clientErrors) {
+    errors.value = clientErrors
+    return
+  }
+
   loading.value = true
   errors.value = {}
-  generalError.value = ''
 
   try {
     await auth.login({ ...form })

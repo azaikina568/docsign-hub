@@ -3,6 +3,8 @@ import { reactive, ref } from 'vue'
 import { useAddParty } from '@/features/documents/queries'
 import type { PartyRole } from '@/shared/api/documents'
 import { normalizeError } from '@/shared/api/errors'
+import { toast } from '@/shared/toast'
+import { partySchema, validate } from '@/shared/validation'
 import FormField from '@/components/FormField.vue'
 import AppButton from '@/components/AppButton.vue'
 
@@ -14,8 +16,15 @@ const errors = ref<Record<string, string>>({})
 const generalError = ref('')
 
 async function onSubmit(): Promise<void> {
-  errors.value = {}
   generalError.value = ''
+
+  const clientErrors = validate(partySchema, { name: form.name, email: form.email })
+  if (clientErrors) {
+    errors.value = clientErrors
+    return
+  }
+
+  errors.value = {}
 
   try {
     // signing_order не задаём — бэкенд сам присвоит следующий по порядку для signer'а.
@@ -23,6 +32,7 @@ async function onSubmit(): Promise<void> {
     form.name = ''
     form.email = ''
     form.role = 'signer'
+    toast.success('Party added.')
   } catch (error) {
     const normalized = normalizeError(error)
     errors.value = normalized.fields

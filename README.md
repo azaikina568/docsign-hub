@@ -71,12 +71,15 @@ outbox в RabbitMQ, а consumer'ы рассылают приглашения п�
 - Frontend подписание: публичная страница по ссылке из письма (`/signing/{token}` — контекст, прогресс, подпись по
   capability или identity), дашборд «To sign» (`/signing-requests`), страница подтверждения email (`/verify-email/...`)
   с resend. Ссылки в письмах ведут на SPA, а не на API.
+- Frontend UX: единые toast-уведомления (успех/ошибка действий), нормализация ошибок бэка по кодам
+  (401/403/404/409/410/422/429/5xx → понятный текст, без «голых» 500), клиентская валидация форм (zod) с подсказкой
+  требований к паролю, «дублировать» терминальный документ в новый draft, mobile-first адаптив.
 
 ## Roadmap
 
 | Дальше | Что |
 | --- | --- |
-| Frontend | дашборд документов, public sign page, viewer read-only, индикатор очереди, состояния loading/empty/error |
+| Frontend-тесты и стандарты | Vitest + Vue Test Utils + MSW, e2e (Playwright), ESLint + Prettier, i18n |
 | CI, docs, cleanup | GitHub Actions (+ GitLab CI), каталог событий (AsyncAPI), финальная документация |
 
 Будущие треки (поиск/Elasticsearch, observability, k8s, микросервисы/gRPC) — за рамками MVP.
