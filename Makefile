@@ -20,7 +20,7 @@ restart: ## перезапустить контейнеры — подхвати
 rebuild: ## пересобрать образы и пересоздать контейнеры (БД сохраняется)
 	$(COMPOSE) up -d --build --force-recreate
 
-fe-reset: ## пересоздать фронт и кэш Vite (БД не трогать) — на случай застрявшего кэша
+fe-reset: ## пересоздать фронт и кэш Vite (БД не трогать) — застрявший кэш / ПОСЛЕ добавления npm-зависимости
 	-$(COMPOSE) exec -T frontend sh -c "rm -rf node_modules/.vite"
 	$(COMPOSE) restart frontend
 

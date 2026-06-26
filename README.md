@@ -96,7 +96,11 @@ DocSign Hub — демонстрационный сервис электронн
 | --- | --- |
 | CI, docs, cleanup | GitHub Actions (+ GitLab CI), каталог событий (AsyncAPI), финальная документация |
 
-Будущие треки (поиск/Elasticsearch, observability, k8s, микросервисы/gRPC) — за рамками MVP.
+После этого — фазированная пост-MVP дорожка: управление аккаунтом (профиль/удаление с анонимизацией PII),
+security-hardening, observability (Sentry/Prometheus), контент документов с файлами и юридической ретенцией
+(S3/MinIO, immutable/WORM + legal hold), локализация писем, real-time (Reverb), поиск (Elasticsearch), админка,
+а в Тир-2 — оптимизация образов, микросервисы и Go-сервис (конвертация + проверка подписи), gRPC, Kubernetes.
+Всё это — за рамками текущего MVP.
 
 ## Запуск
 
