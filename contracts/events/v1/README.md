@@ -22,16 +22,20 @@ Every event shares the same envelope (see the `*.example.json` files):
 
 ## Routing keys
 
-`document.created.v1`, `document.sent.v1`, `document.signed.v1`, `document.completed.v1`,
-`document.cancelled.v1`, `document.expired.v1`.
+**Backend-emitted** (via the outbox): `document.created.v1`, `document.sent.v1`, `document.signed.v1`,
+`document.completed.v1`, `document.cancelled.v1`, `document.expired.v1`.
 
-The authoritative list of event types, versions and routing keys is the `DomainEventType` enum
+**Platform-produced** (by a polyglot service, not the PHP outbox): `signature.verified.v1` — emitted by the
+Go `signing-worker` after re-checking a signature. Same envelope; document-scoped (`aggregate_type=document`,
+data carries `signature_id` + `valid`). See `plans/POLYGLOT_SERVICES.md`.
+
+The authoritative list of **backend** event types/versions/routing keys is the `DomainEventType` enum
 (`backend/app/Domain/Messaging/Enums`). The `*.example.json` files illustrate the payload shape; the
-`*.schema.json` files are machine-checkable JSON Schemas validated against every recorded event in
-`EventContractTest`. A broker-level catalog (channels, routing keys, consumers) lives in
-[`../../asyncapi.json`](../../asyncapi.json) — AsyncAPI 3.0.0 that `$ref`s these same schemas, so it
-cannot drift (`AsyncApiCatalogTest` asserts a channel per `DomainEventType`). Open it in
-[AsyncAPI Studio](https://studio.asyncapi.com/) to browse/render.
+`*.schema.json` files are machine-checkable JSON Schemas — backend events are validated against every recorded
+event in `EventContractTest`. A broker-level catalog (channels, routing keys, consumers, `x-producer`) lives in
+[`../../asyncapi.json`](../../asyncapi.json) — AsyncAPI 3.0.0 that `$ref`s these same schemas, so it cannot drift
+(`AsyncApiCatalogTest`: backend channels mirror `DomainEventType`, platform channels must reference a real schema).
+Open it in [AsyncAPI Studio](https://studio.asyncapi.com/) to browse/render.
 
 ## Consumers
 

@@ -8,9 +8,12 @@ use Tests\TestCase;
 class AsyncApiCatalogTest extends TestCase
 {
     /**
-     * AsyncAPI-каталог обязан покрывать ровно реестр DomainEventType: каждый тип — отдельным каналом
-     * с правильным routing key и сообщением, ссылающимся на существующую JSON Schema. Так каталог не
-     * разъезжается с кодом — новый тип события «потребует» строки здесь (как EventContractTest для схем).
+     * AsyncAPI-каталог не должен разъезжаться с кодом. Каналы помечены `x-producer`:
+     * - **backend** (эмитит ядро через outbox) обязаны зеркалить ровно реестр DomainEventType;
+     * - **platform** (производят полиглот-сервисы, напр. Go signing-worker для signature.verified)
+     *   проверяем мягче — их нет в DomainEventType, но схема обязана существовать.
+     * Так новый backend-тип «потребует» строки здесь (как EventContractTest для схем), а platform-события
+     * не ломают инвариант про реестр.
      */
     public function test_catalog_covers_every_domain_event_type(): void
     {
@@ -26,26 +29,51 @@ class AsyncApiCatalogTest extends TestCase
         $channels = $catalog['channels'] ?? [];
         $messages = $catalog['components']['messages'] ?? [];
 
-        // Адреса каналов = ровно множество routing key'ев реестра (без пропусков и лишних).
+        // Backend-каналы = ровно множество routing key'ев реестра (без пропусков и лишних).
+        $backendAddresses = array_values(array_map(
+            fn (array $c) => $c['address'] ?? null,
+            array_filter($channels, fn (array $c) => ($c['x-producer'] ?? null) === 'backend')
+        ));
         $expectedRoutingKeys = array_map(fn (DomainEventType $t) => $t->routingKey(), DomainEventType::cases());
-        $actualRoutingKeys = array_values(array_map(fn (array $c) => $c['address'] ?? null, $channels));
         sort($expectedRoutingKeys);
-        sort($actualRoutingKeys);
-        $this->assertSame($expectedRoutingKeys, $actualRoutingKeys, 'channels must mirror DomainEventType routing keys');
+        sort($backendAddresses);
+        $this->assertSame($expectedRoutingKeys, $backendAddresses, 'backend channels must mirror DomainEventType routing keys');
 
         foreach (DomainEventType::cases() as $type) {
             $channel = $this->channelByAddress($channels, $type->routingKey());
             $this->assertNotNull($channel, "no channel for {$type->routingKey()}");
+            $this->assertSame('backend', $channel['x-producer'] ?? null, "{$type->value} must be x-producer=backend");
 
             // Канал ссылается на сообщение, сообщение — на JSON Schema этого же типа, и файл реально есть.
-            $messageRef = array_values($channel['messages'])[0]['$ref'] ?? '';
-            $messageKey = basename((string) $messageRef);
-            $this->assertArrayHasKey($messageKey, $messages, "message {$messageKey} missing in components");
-
-            $schemaRef = $messages[$messageKey]['payload']['schema']['$ref'] ?? '';
+            $schemaRef = $this->schemaRefFor($channel, $messages);
             $this->assertSame("./events/v1/{$type->value}.schema.json", $schemaRef, "wrong schema ref for {$type->value}");
             $this->assertFileExists("{$contractsPath}/{$type->value}.schema.json");
         }
+
+        // Platform-каналы (другой producer): хотя бы один, каждый ссылается на существующую схему.
+        $platformChannels = array_filter($channels, fn (array $c) => ($c['x-producer'] ?? 'backend') !== 'backend');
+        $this->assertNotEmpty($platformChannels, 'expected at least one platform channel (e.g. signature.verified)');
+
+        foreach ($platformChannels as $name => $channel) {
+            $schemaRef = $this->schemaRefFor($channel, $messages);
+            $this->assertStringStartsWith('./events/v1/', $schemaRef, "schema ref for {$name} must point into events/v1");
+            $this->assertFileExists($contractsPath.'/'.basename($schemaRef), "schema file missing for channel {$name}");
+        }
+    }
+
+    /**
+     * Достаёт `$ref` JSON Schema, на которую через сообщение ссылается канал.
+     *
+     * @param  array<string, mixed>  $channel
+     * @param  array<string, array<string, mixed>>  $messages
+     */
+    private function schemaRefFor(array $channel, array $messages): string
+    {
+        $messageRef = array_values($channel['messages'])[0]['$ref'] ?? '';
+        $messageKey = basename((string) $messageRef);
+        $this->assertArrayHasKey($messageKey, $messages, "message {$messageKey} missing in components");
+
+        return (string) ($messages[$messageKey]['payload']['schema']['$ref'] ?? '');
     }
 
     /**

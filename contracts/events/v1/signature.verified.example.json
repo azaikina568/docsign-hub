@@ -1,0 +1,16 @@
+{
+  "event_id": "018f7a01-4c2d-7e6f-9a8b-1c2d3e4f5a6b",
+  "event_type": "signature.verified",
+  "routing_key": "signature.verified.v1",
+  "version": 1,
+  "occurred_at": "2026-06-24T10:00:05.000000Z",
+  "aggregate_type": "document",
+  "aggregate_id": "01JZX9V0Q9N6K3J6T2R8M4D5AB",
+  "actor_id": null,
+  "data": {
+    "signature_id": 9,
+    "party_id": 17,
+    "valid": true,
+    "checked_at": "2026-06-24T10:00:05.000000Z"
+  }
+}

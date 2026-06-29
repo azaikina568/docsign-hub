@@ -3,7 +3,7 @@
   "info": {
     "title": "DocSign Hub domain events",
     "version": "1.0.0",
-    "description": "Catalog of domain events published to the RabbitMQ topic exchange `docsign.events`.\nEach domain action records an event into the transactional `outbox_messages` table in the same\ntransaction; a publisher ships the stored envelope to the broker. Delivery is at-least-once and\nconsumers dedup on `event_id` (carried as the AMQP `message_id`) via an inbox.\n\nTwo consumers bind to `document.*.v1`: **notifications** (sequential signing invitations and the\nexpiry notice) and **audit** (append-only MongoDB journal). Payloads carry no secrets or PII —\nsigning tokens and participant emails never appear in an event.\n\nThe machine-checkable payload schemas live in `events/v1/*.schema.json` and are the single source\nof truth (validated against every recorded event in `EventContractTest`); this document references\nthem so the catalog cannot drift.",
+    "description": "Catalog of domain events on the RabbitMQ topic exchange `docsign.events`.\n\n**Backend-emitted** events (`x-producer: backend`) are recorded by the Laravel core into the\ntransactional `outbox_messages` table in the same transaction and shipped by a publisher. Delivery is\nat-least-once and consumers dedup on `event_id` (carried as the AMQP `message_id`) via an inbox. Two\nconsumers bind to `document.*.v1`: **notifications** (sequential signing invitations and the expiry\nnotice) and **audit** (append-only MongoDB journal).\n\n**Platform-produced** events (`x-producer: <service>`) are emitted by polyglot services, not the PHP\noutbox — e.g. `signature.verified.v1` from the Go `signing-worker`. They share the same envelope and\ndedup rules. See `POLYGLOT_SERVICES.md`.\n\nPayloads carry no secrets or PII — signing tokens and participant emails never appear in an event. The\nmachine-checkable payload schemas live in `events/v1/*.schema.json` and are the single source of truth\n(backend events validated in `EventContractTest`); this document references them so it cannot drift\n(`AsyncApiCatalogTest`).",
     "license": { "name": "MIT" }
   },
   "servers": {
@@ -19,6 +19,7 @@
       "address": "document.created.v1",
       "title": "document.created",
       "description": "A draft document was created.",
+      "x-producer": "backend",
       "servers": [{ "$ref": "#/servers/rabbitmq" }],
       "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
       "messages": { "documentCreated": { "$ref": "#/components/messages/documentCreated" } }
@@ -27,6 +28,7 @@
       "address": "document.sent.v1",
       "title": "document.sent",
       "description": "A document was sent for signing. Triggers the first signing invitation (notifications consumer).",
+      "x-producer": "backend",
       "servers": [{ "$ref": "#/servers/rabbitmq" }],
       "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
       "messages": { "documentSent": { "$ref": "#/components/messages/documentSent" } }
@@ -34,7 +36,8 @@
     "documentSigned": {
       "address": "document.signed.v1",
       "title": "document.signed",
-      "description": "A party signed. Triggers the next signer's invitation while the document is still open (notifications consumer).",
+      "description": "A party signed. Triggers the next signer's invitation while the document is still open (notifications consumer); also consumed by the Go signing-worker for verification.",
+      "x-producer": "backend",
       "servers": [{ "$ref": "#/servers/rabbitmq" }],
       "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
       "messages": { "documentSigned": { "$ref": "#/components/messages/documentSigned" } }
@@ -43,6 +46,7 @@
       "address": "document.completed.v1",
       "title": "document.completed",
       "description": "All signers signed; the envelope is complete.",
+      "x-producer": "backend",
       "servers": [{ "$ref": "#/servers/rabbitmq" }],
       "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
       "messages": { "documentCompleted": { "$ref": "#/components/messages/documentCompleted" } }
@@ -51,6 +55,7 @@
       "address": "document.cancelled.v1",
       "title": "document.cancelled",
       "description": "The owner cancelled the document.",
+      "x-producer": "backend",
       "servers": [{ "$ref": "#/servers/rabbitmq" }],
       "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
       "messages": { "documentCancelled": { "$ref": "#/components/messages/documentCancelled" } }
@@ -59,9 +64,19 @@
       "address": "document.expired.v1",
       "title": "document.expired",
       "description": "The signing deadline passed before completion. Triggers the expiry notice to the owner (notifications consumer).",
+      "x-producer": "backend",
       "servers": [{ "$ref": "#/servers/rabbitmq" }],
       "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
       "messages": { "documentExpired": { "$ref": "#/components/messages/documentExpired" } }
+    },
+    "signatureVerified": {
+      "address": "signature.verified.v1",
+      "title": "signature.verified",
+      "description": "The Go signing-worker re-checked a signature's content_hash/signature_hash and reports the result. Document-scoped (aggregate = document); data carries the signature id and the verdict.",
+      "x-producer": "signing-worker",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "signatureVerified": { "$ref": "#/components/messages/signatureVerified" } }
     }
   },
   "operations": {
@@ -94,6 +109,11 @@
       "action": "send",
       "channel": { "$ref": "#/channels/documentExpired" },
       "summary": "Publish document.expired."
+    },
+    "publishSignatureVerified": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/signatureVerified" },
+      "summary": "Publish signature.verified (emitted by the Go signing-worker)."
     }
   },
   "components": {
@@ -133,6 +153,12 @@
         "title": "Document expired",
         "contentType": "application/json",
         "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.expired.schema.json" } }
+      },
+      "signatureVerified": {
+        "name": "signature.verified",
+        "title": "Signature verified",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/signature.verified.schema.json" } }
       }
     }
   }
