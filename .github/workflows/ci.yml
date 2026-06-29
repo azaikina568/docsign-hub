@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Только последний прогон на ветку — ранние отменяем (экономия раннеров).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (PHP 8.4)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      # Расширения = рантайм-таргет (Docker-образ): mongodb/sockets нужны для composer install
+      # (их требует mongodb/mongodb), pdo_sqlite/sqlite3 — для тестов на sqlite :memory:.
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: intl, pcntl, sockets, pdo_sqlite, sqlite3, mongodb, redis, zip, bcmath
+          ini-values: memory_limit=512M
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+
+      # Тесты форсят sqlite/array в tests/bootstrap.php, но Pint/PHPStan бутят контейнер → нужен APP_KEY.
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Code style (Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: Static analysis (PHPStan)
+        run: ./vendor/bin/phpstan analyse --no-progress
+
+      - name: Tests
+        run: php artisan test
+
+      # Сигнальный (не блокирующий) аудит зависимостей — advisories видны, но не валят чистый клон.
+      - name: Dependency audit
+        run: composer audit --no-interaction
+        continue-on-error: true
+
+  frontend:
+    name: Frontend (Node 22)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Format check (Prettier)
+        run: npm run format:check
+
+      - name: Type check (vue-tsc)
+        run: npm run type-check
+
+      - name: Unit tests (Vitest)
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency audit
+        run: npm audit --omit=dev
+        continue-on-error: true
