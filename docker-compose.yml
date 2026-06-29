@@ -202,6 +202,17 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  # Go-сервис проверки подписи (полиглот-демо). GO-1: только HTTP-каркас (health/metrics).
+  # Брокер/БД подключатся на GO-2 (consume document.signed → verify → publish signature.verified).
+  signing-worker:
+    build:
+      context: ./services/signing-worker
+    environment:
+      SIGNING_WORKER_ADDR: ":8090"
+    ports:
+      - "${SIGNING_WORKER_PORT:-8090}:8090"
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

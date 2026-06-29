@@ -140,6 +140,7 @@ docker compose exec backend php artisan migrate:fresh --seed
 | API health | http://localhost:8080/api/v1/health |
 | API docs (OpenAPI/Swagger) | http://localhost:8080/docs/api |
 | Диаграммы (отрисованные) | http://localhost:8080/docs/diagrams |
+| signing-worker (Go) health | http://localhost:8090/healthz |
 | RabbitMQ (`docsign`) | http://localhost:15672 |
 | Mailpit | http://localhost:8025 |
 | PostgreSQL | `localhost:5432` |
@@ -208,6 +209,7 @@ GitHub и на `/docs/diagrams`).
 backend/    Laravel 12 API (app/Domain, app/Http, config, database, tests)
 frontend/   Vue 3 + TS + Vite SPA (api-клиент, refresh, stores, router, pages, i18n en/ru; тесты Vitest + MSW, ESLint/Prettier)
 contracts/  версионированные контракты событий: JSON Schema (events/v1) + каталог AsyncAPI (asyncapi.json)
+services/   полиглот-сервисы: signing-worker (Go/Fiber — проверка подписи; пока каркас health/metrics)
 docs/       architecture.md, diagrams.md
 infra/      Docker-обвязка (nginx, php Dockerfile)
 docker-compose.yml, Makefile, .env.example

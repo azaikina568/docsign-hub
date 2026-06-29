@@ -92,6 +92,36 @@ frontend:test:
   script:
     - npm run test:run
 
+# Go signing-worker — path-filtered: джоб появляется только при изменениях сервиса.
+.signing-worker-changes: &signing-worker-changes
+  rules:
+    - changes: [services/signing-worker/**/*]
+
+signing-worker:lint:
+  <<: *signing-worker-changes
+  stage: lint
+  image: golangci/golangci-lint:v2.12.2
+  script:
+    - cd services/signing-worker
+    - test -z "$(gofmt -l .)"
+    - golangci-lint run ./...
+
+signing-worker:test:
+  <<: *signing-worker-changes
+  stage: test
+  image: golang:1.23-alpine
+  variables:
+    GOPATH: $CI_PROJECT_DIR/.cache/go
+  cache:
+    key: go-signing-worker
+    paths:
+      - .cache/go/pkg/mod/
+  script:
+    - cd services/signing-worker
+    - go vet ./...
+    - go test ./...
+    - go build ./...
+
 # --- build ---
 
 frontend:build:

@@ -300,7 +300,9 @@ sequenceDiagram
 
 **Что показывает:** какие контейнеры есть и кто с кем общается. Сплошные стрелки — рантайм, пунктир —
 dev-почта. `publisher` вычитывает outbox в брокер; два consumer'а читают из брокера (уведомления шлют письма,
-audit пишет в MongoDB); `queue-worker` шлёт фоновые письма приложения (подтверждение email).
+audit пишет в MongoDB); `queue-worker` шлёт фоновые письма приложения (подтверждение email). `signing-worker`
+(Go/Fiber) пока стоит особняком — отдаёт health/metrics; на GO-2 подключится к брокеру и БД (consume
+`document.signed` → проверка → publish `signature.verified`).
 
 ```mermaid
 flowchart LR
@@ -311,6 +313,7 @@ flowchart LR
     qworker["queue-worker (queue:work)"]
     cnotif["consumer-notifications"]
     caudit["consumer-audit"]
+    sworker["signing-worker (Go/Fiber: health, metrics)"]
     backend --> postgres[("PostgreSQL")]
     backend --> redis[("Redis: cache, rate-limit, locks")]
     scheduler --> postgres
@@ -324,6 +327,7 @@ flowchart LR
     cnotif -.->|dev| mailpit
     caudit --> mongodb[("MongoDB: audit")]
     backend -.->|dev| mailpit
+    Client -->|HTTP health/metrics| sworker
 ```
 
 ## События и очереди
