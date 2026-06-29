@@ -10,7 +10,7 @@
         "dedoc/scramble": "^0.13.28",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.3",
-        "laravel/tinker": "^2.10.1",
+        "laravel/tinker": "^3.0.2",
         "mongodb/mongodb": "^2.1",
         "php-amqplib/php-amqplib": "^3.7"
     },
