@@ -25,7 +25,7 @@ DocSign Hub — демонстрационный сервис электронн
 Каждый push и PR в `main` проходит через CI ([GitHub Actions](.github/workflows/ci.yml) и зеркальный
 [GitLab CI](.gitlab-ci.yml)): гейт обоих стеков, миграции+сид на реальном Postgres и сборка Docker-образа.
 Релизный деплой (публикация образа + SSH на сервер) — [отдельным workflow](.github/workflows/deploy.yml) по
-тегу/вручную. Дальше — финальная вычитка документации (см. [Roadmap](#roadmap)).
+тегу/вручную. На этом MVP функционально завершён; дальше — пост-MVP треки (см. [Roadmap](#roadmap)).
 
 ## Стек
 
@@ -33,8 +33,8 @@ DocSign Hub — демонстрационный сервис электронн
   RabbitMQ (доменные события через outbox), MongoDB (audit-журнал), Mailpit (почта в dev).
 - **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (компоненты вручную), TanStack Query, Pinia, zod, vue-i18n (en/ru);
   Vitest + Vue Test Utils + MSW, Playwright (e2e), ESLint + Prettier.
-- **Инфраструктура/инструменты:** Docker Compose (+ отдельный scheduler-контейнер), nginx, Makefile, PHPUnit, Pint,
-  PHPStan/Larastan, OpenAPI/Swagger (Scramble).
+- **Инфраструктура/инструменты:** Docker Compose (отдельные воркеры: scheduler, outbox-publisher, consumers,
+  queue-worker), nginx, Makefile, PHPUnit, Pint, PHPStan/Larastan, OpenAPI/Swagger (Scramble).
 
 ## Возможности (реализовано)
 
@@ -100,7 +100,7 @@ DocSign Hub — демонстрационный сервис электронн
 
 | Дальше | Что |
 | --- | --- |
-| CI, docs, cleanup | GitHub Actions + GitLab CI ✅ (гейт обоих стеков, миграции на Postgres, сборка образа, деплой по тегу), каталог событий AsyncAPI ✅, далее финальная вычитка документации |
+| CI, docs, cleanup ✅ | GitHub Actions + GitLab CI (гейт обоих стеков, миграции на Postgres, сборка образа, деплой по тегу), каталог событий AsyncAPI, финальная вычитка документации — **MVP завершён** |
 
 После этого — фазированная пост-MVP дорожка: управление аккаунтом (профиль/удаление с анонимизацией PII),
 security-hardening, observability (Sentry/Prometheus), контент документов с файлами и юридической ретенцией
@@ -258,8 +258,9 @@ npm run e2e                        # сквозной сценарий подп�
 
 - Это demo, не юридически значимая система ЭЦП; подпись демонстрационная.
 - Приглашения и уведомления уходят в Mailpit (локально); наружу реальная почта/SMS не отправляются.
-- Publisher и consumer'ы — по одному инстансу (без конкурентного вычитывания); горизонтальное
-  масштабирование (`FOR UPDATE SKIP LOCKED`, несколько воркеров) описано, но намеренно не включено.
+- Publisher — один инстанс: конкурентное вычитывание outbox несколькими воркерами (`FOR UPDATE SKIP LOCKED`)
+  описано, но намеренно не включено. Consumer'ы запущены по одному, но безопасно масштабируются горизонтально
+  (competing consumers + дедуп по inbox делает повторную доставку no-op).
 - Audit-журнал в MongoDB пишется append-only; UI/поиск по нему — будущий трек.
 - Frontend покрыт юнит/компонентными тестами (Vitest + MSW) и сквозным e2e (Playwright) основного сценария; локализован
   на en/ru (vue-i18n). Локализация писем/бэкенда (язык по получателю) — будущий трек.
