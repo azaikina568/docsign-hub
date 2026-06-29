@@ -1,0 +1,154 @@
+# Параллель к GitHub Actions (.github/workflows/*). Те же стадии: lint -> test -> build -> deploy.
+# Гайд по настройке (раннеры, переменные, локальный прогон) — plans/CI_SETUP.md.
+
+stages: [lint, test, build, deploy]
+
+variables:
+  COMPOSER_CACHE_DIR: "$CI_PROJECT_DIR/.cache/composer"
+  npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
+
+# --- Базовый PHP-джоб: ставит расширения рантайм-таргета + зависимости, кэширует vendor. ---
+.php:
+  image: php:8.4-cli
+  cache:
+    key: composer-v1
+    paths:
+      - backend/vendor/
+      - .cache/composer/
+  before_script:
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip libicu-dev libzip-dev libpq-dev libsqlite3-dev libssl-dev $PHPIZE_DEPS
+    - docker-php-ext-install -j"$(nproc)" intl pcntl sockets pdo_pgsql pdo_sqlite zip > /dev/null
+    - pecl install mongodb redis > /dev/null && docker-php-ext-enable mongodb redis
+    - echo "memory_limit=512M" > /usr/local/etc/php/conf.d/zz-ci.ini
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - cd backend && composer install --no-interaction --prefer-dist --no-progress
+    - cp .env.example .env && php artisan key:generate
+
+.node:
+  image: node:22
+  cache:
+    key: npm-v1
+    paths:
+      - .cache/npm/
+  before_script:
+    - cd frontend && npm ci
+
+# --- lint ---
+
+backend:lint:
+  extends: .php
+  stage: lint
+  script:
+    - ./vendor/bin/pint --test
+    - ./vendor/bin/phpstan analyse --no-progress
+    - composer audit --no-interaction || true
+
+frontend:lint:
+  extends: .node
+  stage: lint
+  script:
+    - npm run lint
+    - npm run format:check
+    - npm run type-check
+    - npm audit --omit=dev || true
+
+# --- test ---
+
+backend:test:
+  extends: .php
+  stage: test
+  script:
+    - php artisan test
+
+# Доказывает, что миграции и сидеры применяются к реальному PostgreSQL (sqlite-тесты это не ловят).
+backend:migrate:
+  extends: .php
+  stage: test
+  services:
+    - postgres:17-alpine
+  variables:
+    POSTGRES_DB: docsign_hub
+    POSTGRES_USER: docsign
+    POSTGRES_PASSWORD: docsign
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_DATABASE: docsign_hub
+    DB_USERNAME: docsign
+    DB_PASSWORD: docsign
+    # Сидер ходит через доменные Actions, но без брокеров: события пишутся только в outbox-таблицу.
+    CACHE_STORE: array
+    SESSION_DRIVER: array
+    QUEUE_CONNECTION: sync
+    MAIL_MAILER: array
+  script:
+    - php artisan migrate:fresh --seed --force
+    - php artisan migrate:status
+
+frontend:test:
+  extends: .node
+  stage: test
+  script:
+    - npm run test:run
+
+# --- build ---
+
+frontend:build:
+  extends: .node
+  stage: build
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 week
+
+# Сборка рантайм-образа через docker-in-docker (локального кэша нет — чистая сборка).
+# Стандартный dind-рецепт GitLab: клиент общается с демоном по TLS на сервисе `docker`.
+.dind:
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "/certs/client"
+
+image:build:
+  extends: .dind
+  stage: build
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA" infra/docker/php
+
+# --- deploy (шаблон, вручную) ---
+
+# Публикация образа в GitLab Container Registry. $CI_REGISTRY_* выдаёт сам GitLab.
+deploy:image:
+  extends: .dind
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: manual
+    - when: manual
+      allow_failure: true
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$CI_REGISTRY_IMAGE/backend:latest" infra/docker/php
+    - docker push "$CI_REGISTRY_IMAGE/backend:latest"
+
+# Серверный деплой по SSH (включается переменными DEPLOY_* в настройках проекта — см. plans/CI_SETUP.md).
+# Прод-секреты (APP_KEY, БД) живут в .env НА сервере, не в CI.
+deploy:server:
+  stage: deploy
+  image: alpine:3
+  rules:
+    - if: '$DEPLOY_HOST'
+      when: manual
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval "$(ssh-agent -s)" && echo "$DEPLOY_SSH_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+  script:
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH && git pull --ff-only && docker compose up -d --build && docker compose exec -T backend php artisan migrate --force"

@@ -14,6 +14,11 @@ concurrency:
 permissions:
   contents: read
 
+# Расширения PHP = рантайм-таргет (Docker-образ): mongodb/sockets нужны уже для composer install
+# (их требует mongodb/mongodb), pdo_sqlite/sqlite3 — для тестов на sqlite :memory:.
+env:
+  PHP_EXTENSIONS: intl, pcntl, sockets, pdo_pgsql, pdo_sqlite, sqlite3, mongodb, redis, zip, bcmath
+
 jobs:
   backend:
     name: Backend (PHP 8.4)
@@ -24,13 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Расширения = рантайм-таргет (Docker-образ): mongodb/sockets нужны для composer install
-      # (их требует mongodb/mongodb), pdo_sqlite/sqlite3 — для тестов на sqlite :memory:.
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: intl, pcntl, sockets, pdo_sqlite, sqlite3, mongodb, redis, zip, bcmath
+          extensions: ${{ env.PHP_EXTENSIONS }}
           ini-values: memory_limit=512M
           coverage: none
           tools: composer:v2
@@ -97,3 +100,83 @@ jobs:
       - name: Dependency audit
         run: npm audit --omit=dev
         continue-on-error: true
+
+  # Тесты идут на sqlite; этот job отдельно доказывает, что миграции и сидеры применяются
+  # к реальному PostgreSQL (тип колонок, ULID-бэкофилл, FK) — то, что sqlite не ловит.
+  migrations:
+    name: Migrations (PostgreSQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: docsign_hub
+          POSTGRES_USER: docsign
+          POSTGRES_PASSWORD: docsign
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docsign -d docsign_hub"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: docsign_hub
+      DB_USERNAME: docsign
+      DB_PASSWORD: docsign
+      # Сидер ходит через доменные Actions, но без брокеров: события пишутся только в outbox-таблицу.
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          ini-values: memory_limit=512M
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrate and seed (fresh schema on Postgres)
+        run: php artisan migrate:fresh --seed --force
+
+      - name: Verify idempotent re-run
+        run: php artisan migrate:status
+
+  # Сборка рантайм-образа: на раннере локального кэша нет (чистая сборка), но слои берём из
+  # GitHub Actions cache → быстро. Доказывает, что Dockerfile собирается из чистого состояния.
+  docker-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build PHP runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./infra/docker/php
+          push: false
+          tags: docsign-hub/backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -22,8 +22,10 @@ DocSign Hub — демонстрационный сервис электронн
 подписание, верификация email, единые toast'ы и валидация форм, локализация en/ru), покрыт юнит/компонентными
 и сквозным e2e (Playwright) тестами.
 
-Каждый push и PR в `main` проходит через [CI на GitHub Actions](.github/workflows/ci.yml) (полный гейт обоих
-стеков). Дальше — параллельный GitLab CI и финальная документация (см. [Roadmap](#roadmap)).
+Каждый push и PR в `main` проходит через CI ([GitHub Actions](.github/workflows/ci.yml) и зеркальный
+[GitLab CI](.gitlab-ci.yml)): гейт обоих стеков, миграции+сид на реальном Postgres и сборка Docker-образа.
+Релизный деплой (публикация образа + SSH на сервер) — [отдельным workflow](.github/workflows/deploy.yml) по
+тегу/вручную. Дальше — каталог событий (AsyncAPI) и финальная документация (см. [Roadmap](#roadmap)).
 
 ## Стек
 
@@ -97,7 +99,7 @@ DocSign Hub — демонстрационный сервис электронн
 
 | Дальше | Что |
 | --- | --- |
-| CI, docs, cleanup | GitHub Actions ✅ (гейт обоих стеков), далее GitLab CI, каталог событий (AsyncAPI), финальная документация |
+| CI, docs, cleanup | GitHub Actions + GitLab CI ✅ (гейт обоих стеков, миграции на Postgres, сборка образа, деплой по тегу), далее каталог событий (AsyncAPI) и финальная документация |
 
 После этого — фазированная пост-MVP дорожка: управление аккаунтом (профиль/удаление с анонимизацией PII),
 security-hardening, observability (Sentry/Prometheus), контент документов с файлами и юридической ретенцией
@@ -213,7 +215,8 @@ docker-compose.yml, Makefile, .env.example
 
 Весь гейт ниже гоняется автоматически в [CI](.github/workflows/ci.yml) на каждый push/PR в `main`: backend
 (Pint, PHPStan, `php artisan test`) и frontend (ESLint, Prettier, type-check, Vitest, build), плюс
-информационный аудит зависимостей (`composer audit`/`npm audit`). Локально — те же команды:
+информационный аудит зависимостей (`composer audit`/`npm audit`). Дополнительно CI прогоняет миграции и сидер
+на реальном PostgreSQL и собирает Docker-образ из чистого состояния. Локально гейт — те же команды:
 
 ```bash
 make test
