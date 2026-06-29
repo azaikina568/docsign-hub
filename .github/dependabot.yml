@@ -1,13 +1,16 @@
 version: 2
 updates:
+  # Группируем всё minor/patch в один PR на экосистему, чтобы не плодить по PR на пакет.
+  # Мажоры остаются отдельными PR — их смотрим поштучно (ломающие изменения).
   - package-ecosystem: composer
     directory: /backend
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      backend-dev:
-        dependency-type: development
+      backend:
+        patterns: ['*']
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /frontend
@@ -15,10 +18,15 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      frontend-dev:
-        dependency-type: development
+      frontend:
+        patterns: ['*']
+        update-types: [minor, patch]
 
+  # Версии GitHub Actions безопасны и редки — собираем все (включая major) в один PR.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
