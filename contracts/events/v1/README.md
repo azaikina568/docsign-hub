@@ -28,7 +28,10 @@ Every event shares the same envelope (see the `*.example.json` files):
 The authoritative list of event types, versions and routing keys is the `DomainEventType` enum
 (`backend/app/Domain/Messaging/Enums`). The `*.example.json` files illustrate the payload shape; the
 `*.schema.json` files are machine-checkable JSON Schemas validated against every recorded event in
-`EventContractTest`. An AsyncAPI catalog is planned.
+`EventContractTest`. A broker-level catalog (channels, routing keys, consumers) lives in
+[`../../asyncapi.json`](../../asyncapi.json) — AsyncAPI 3.0.0 that `$ref`s these same schemas, so it
+cannot drift (`AsyncApiCatalogTest` asserts a channel per `DomainEventType`). Open it in
+[AsyncAPI Studio](https://studio.asyncapi.com/) to browse/render.
 
 ## Consumers
 

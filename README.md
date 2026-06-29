@@ -25,7 +25,7 @@ DocSign Hub — демонстрационный сервис электронн
 Каждый push и PR в `main` проходит через CI ([GitHub Actions](.github/workflows/ci.yml) и зеркальный
 [GitLab CI](.gitlab-ci.yml)): гейт обоих стеков, миграции+сид на реальном Postgres и сборка Docker-образа.
 Релизный деплой (публикация образа + SSH на сервер) — [отдельным workflow](.github/workflows/deploy.yml) по
-тегу/вручную. Дальше — каталог событий (AsyncAPI) и финальная документация (см. [Roadmap](#roadmap)).
+тегу/вручную. Дальше — финальная вычитка документации (см. [Roadmap](#roadmap)).
 
 ## Стек
 
@@ -70,7 +70,8 @@ DocSign Hub — демонстрационный сервис электронн
 **События (messaging)**
 - Доменные события (`document.created/sent/signed/completed/cancelled/expired`) пишутся в transactional
   outbox в одной транзакции с бизнес-данными и публикуются worker'ом в RabbitMQ (`docsign.events`) с
-  ретраями/backoff. Форма каждого события зафиксирована JSON Schema (`contracts/events/v1`).
+  ретраями/backoff. Форма каждого события зафиксирована JSON Schema (`contracts/events/v1`), а брокерный
+  каталог (каналы, routing key, consumer'ы) — AsyncAPI 3.0.0 (`contracts/asyncapi.json`).
 - Два consumer'а читают события: **уведомления** (приглашения по очереди, письмо владельцу об истечении) и
   **audit** (неизменяемый журнал в MongoDB, `audit_events`). At-least-once + дедуп по `event_id` (inbox);
   отвергнутые сообщения уходят в dead-letter (`docsign.dlq`).
@@ -99,7 +100,7 @@ DocSign Hub — демонстрационный сервис электронн
 
 | Дальше | Что |
 | --- | --- |
-| CI, docs, cleanup | GitHub Actions + GitLab CI ✅ (гейт обоих стеков, миграции на Postgres, сборка образа, деплой по тегу), далее каталог событий (AsyncAPI) и финальная документация |
+| CI, docs, cleanup | GitHub Actions + GitLab CI ✅ (гейт обоих стеков, миграции на Postgres, сборка образа, деплой по тегу), каталог событий AsyncAPI ✅, далее финальная вычитка документации |
 
 После этого — фазированная пост-MVP дорожка: управление аккаунтом (профиль/удаление с анонимизацией PII),
 security-hardening, observability (Sentry/Prometheus), контент документов с файлами и юридической ретенцией
@@ -189,7 +190,8 @@ PostgreSQL — источник истины (пользователи, доку
 (rate-limit, cache, short-lived locks). Доменные события идут через **transactional outbox**: действие в своей
 транзакции пишет бизнес-данные и строку в `outbox_messages` (атомарно, без потерь), а отдельный worker-publisher
 (`outbox:publish`) шлёт их в topic-exchange `docsign.events` с ретраями/backoff. Форма каждого события
-зафиксирована JSON Schema (`contracts/events/v1`). Два consumer'а (`messaging:consume notifications|audit`)
+зафиксирована JSON Schema (`contracts/events/v1`), а каталог брокера — AsyncAPI (`contracts/asyncapi.json`,
+ссылается на те же схемы). Два consumer'а (`messaging:consume notifications|audit`)
 читают события: уведомления рассылают приглашения по очереди и пишут владельцу об истечении, audit складывает
 неизменяемый журнал в MongoDB. Доставка at-least-once, идемпотентность — inbox по `event_id`; необрабатываемые
 сообщения уходят в dead-letter. Это задел под микросервисы: кросс-контекстные эффекты идут через
@@ -205,7 +207,7 @@ GitHub и на `/docs/diagrams`).
 ```
 backend/    Laravel 12 API (app/Domain, app/Http, config, database, tests)
 frontend/   Vue 3 + TS + Vite SPA (api-клиент, refresh, stores, router, pages, i18n en/ru; тесты Vitest + MSW, ESLint/Prettier)
-contracts/  версионированные контракты событий (JSON Schema) для RabbitMQ
+contracts/  версионированные контракты событий: JSON Schema (events/v1) + каталог AsyncAPI (asyncapi.json)
 docs/       architecture.md, diagrams.md
 infra/      Docker-обвязка (nginx, php Dockerfile)
 docker-compose.yml, Makefile, .env.example

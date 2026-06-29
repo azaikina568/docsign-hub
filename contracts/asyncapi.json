@@ -1,0 +1,139 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "DocSign Hub domain events",
+    "version": "1.0.0",
+    "description": "Catalog of domain events published to the RabbitMQ topic exchange `docsign.events`.\nEach domain action records an event into the transactional `outbox_messages` table in the same\ntransaction; a publisher ships the stored envelope to the broker. Delivery is at-least-once and\nconsumers dedup on `event_id` (carried as the AMQP `message_id`) via an inbox.\n\nTwo consumers bind to `document.*.v1`: **notifications** (sequential signing invitations and the\nexpiry notice) and **audit** (append-only MongoDB journal). Payloads carry no secrets or PII —\nsigning tokens and participant emails never appear in an event.\n\nThe machine-checkable payload schemas live in `events/v1/*.schema.json` and are the single source\nof truth (validated against every recorded event in `EventContractTest`); this document references\nthem so the catalog cannot drift.",
+    "license": { "name": "MIT" }
+  },
+  "servers": {
+    "rabbitmq": {
+      "host": "rabbitmq:5672",
+      "protocol": "amqp",
+      "description": "RabbitMQ broker. Durable topic exchange `docsign.events`; routing key `{event_type}.v{version}`."
+    }
+  },
+  "defaultContentType": "application/json",
+  "channels": {
+    "documentCreated": {
+      "address": "document.created.v1",
+      "title": "document.created",
+      "description": "A draft document was created.",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "documentCreated": { "$ref": "#/components/messages/documentCreated" } }
+    },
+    "documentSent": {
+      "address": "document.sent.v1",
+      "title": "document.sent",
+      "description": "A document was sent for signing. Triggers the first signing invitation (notifications consumer).",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "documentSent": { "$ref": "#/components/messages/documentSent" } }
+    },
+    "documentSigned": {
+      "address": "document.signed.v1",
+      "title": "document.signed",
+      "description": "A party signed. Triggers the next signer's invitation while the document is still open (notifications consumer).",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "documentSigned": { "$ref": "#/components/messages/documentSigned" } }
+    },
+    "documentCompleted": {
+      "address": "document.completed.v1",
+      "title": "document.completed",
+      "description": "All signers signed; the envelope is complete.",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "documentCompleted": { "$ref": "#/components/messages/documentCompleted" } }
+    },
+    "documentCancelled": {
+      "address": "document.cancelled.v1",
+      "title": "document.cancelled",
+      "description": "The owner cancelled the document.",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "documentCancelled": { "$ref": "#/components/messages/documentCancelled" } }
+    },
+    "documentExpired": {
+      "address": "document.expired.v1",
+      "title": "document.expired",
+      "description": "The signing deadline passed before completion. Triggers the expiry notice to the owner (notifications consumer).",
+      "servers": [{ "$ref": "#/servers/rabbitmq" }],
+      "bindings": { "amqp": { "is": "routingKey", "exchange": { "name": "docsign.events", "type": "topic", "durable": true } } },
+      "messages": { "documentExpired": { "$ref": "#/components/messages/documentExpired" } }
+    }
+  },
+  "operations": {
+    "publishDocumentCreated": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/documentCreated" },
+      "summary": "Publish document.created."
+    },
+    "publishDocumentSent": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/documentSent" },
+      "summary": "Publish document.sent."
+    },
+    "publishDocumentSigned": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/documentSigned" },
+      "summary": "Publish document.signed."
+    },
+    "publishDocumentCompleted": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/documentCompleted" },
+      "summary": "Publish document.completed."
+    },
+    "publishDocumentCancelled": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/documentCancelled" },
+      "summary": "Publish document.cancelled."
+    },
+    "publishDocumentExpired": {
+      "action": "send",
+      "channel": { "$ref": "#/channels/documentExpired" },
+      "summary": "Publish document.expired."
+    }
+  },
+  "components": {
+    "messages": {
+      "documentCreated": {
+        "name": "document.created",
+        "title": "Document created",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.created.schema.json" } }
+      },
+      "documentSent": {
+        "name": "document.sent",
+        "title": "Document sent",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.sent.schema.json" } }
+      },
+      "documentSigned": {
+        "name": "document.signed",
+        "title": "Document signed",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.signed.schema.json" } }
+      },
+      "documentCompleted": {
+        "name": "document.completed",
+        "title": "Document completed",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.completed.schema.json" } }
+      },
+      "documentCancelled": {
+        "name": "document.cancelled",
+        "title": "Document cancelled",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.cancelled.schema.json" } }
+      },
+      "documentExpired": {
+        "name": "document.expired",
+        "title": "Document expired",
+        "contentType": "application/json",
+        "payload": { "schemaFormat": "application/schema+json;version=draft-07", "schema": { "$ref": "./events/v1/document.expired.schema.json" } }
+      }
+    }
+  }
+}
